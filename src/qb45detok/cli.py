@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 from typing import List, Optional
 
 from .decode import decode_file, decode_section
 from .render import Renderer
+from .quickhelp import HelpFile, QuickHelpError
 from .reader import BinFile, ParseError, REF_BASE, Section
 
 
@@ -166,6 +168,57 @@ def cmd_detok(args) -> int:
     return 0
 
 
+# -- QuickHelp ----------------------------------------------------------
+
+def cmd_hlp_list(args) -> int:
+    """List the context names a QuickHelp file defines."""
+    hf = HelpFile.from_path(args.file)
+    print(f"{hf.name}: {hf.topic_count} topics, {len(hf.contexts)} contexts, "
+          f"{len(hf.keywords)} keywords")
+    for name in sorted(hf.contexts, key=str.lower):
+        print(f"  {name:<28} topic {hf.contexts[name]}")
+    return 0
+
+
+def cmd_hlp_show(args) -> int:
+    """Print one topic, by context name or by number."""
+    hf = HelpFile.from_path(args.file)
+    number = hf.topic_for(args.topic)
+    if number is None:
+        if not args.topic.isdigit():
+            print(f"qb45detok: no context named {args.topic!r}", file=sys.stderr)
+            return 1
+        number = int(args.topic)
+    if not 0 <= number < hf.topic_count:
+        print(f"qb45detok: topic {number} out of range", file=sys.stderr)
+        return 1
+    for line in hf.topic(number)[1 if args.body else 0:]:
+        print(line)
+    return 0
+
+
+def cmd_hlp_dump(args) -> int:
+    """Write every topic out, one file each, named for its context."""
+    hf = HelpFile.from_path(args.file)
+    out = Path(args.output)
+    out.mkdir(parents=True, exist_ok=True)
+    by_topic = {}
+    for name, number in hf.contexts.items():
+        by_topic.setdefault(number, name)
+    written = 0
+    for number in range(hf.topic_count):
+        stem = by_topic.get(number, "topic")
+        safe = "".join(c if c.isalnum() or c in "._-$" else "_" for c in stem)
+        # The number keeps the name unique: contexts collide once mangled,
+        # and most topics have no context at all.
+        lines = hf.topic(number)[1 if args.body else 0:]
+        (out / f"{number:04d}_{safe}.txt").write_text(
+            "\n".join(lines) + "\n", encoding="latin-1")
+        written += 1
+    print(f"wrote {written} topics to {out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="qb45detok",
@@ -202,6 +255,24 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("file")
     t.add_argument("-o", "--output", help="write CRLF text to this file instead of stdout")
     t.set_defaults(func=cmd_detok)
+
+    hl = sub.add_parser("hlp-list", help="list the contexts in a QuickHelp .HLP file")
+    hl.add_argument("file")
+    hl.set_defaults(func=cmd_hlp_list)
+
+    hs = sub.add_parser("hlp-show", help="print one QuickHelp topic")
+    hs.add_argument("file")
+    hs.add_argument("topic", help="a context name, or a topic number")
+    hs.add_argument("--body", action="store_true",
+                    help="skip the leading menu bar line")
+    hs.set_defaults(func=cmd_hlp_show)
+
+    hd = sub.add_parser("hlp-dump", help="write every QuickHelp topic to a directory")
+    hd.add_argument("file")
+    hd.add_argument("-o", "--output", required=True, help="directory to write into")
+    hd.add_argument("--body", action="store_true",
+                    help="skip the leading menu bar line")
+    hd.set_defaults(func=cmd_hlp_dump)
     return p
 
 

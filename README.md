@@ -83,6 +83,19 @@ qb45detok detok PROGRAM.BAS              # write source to stdout
 qb45detok detok PROGRAM.BAS -o OUT.BAS   # write a CRLF text file
 ```
 
+It also reads QuickBASIC's own help databases, which are a separate Microsoft
+format that nothing modern opens:
+
+```
+qb45detok hlp-list QB45QCK.HLP              # the contexts it defines
+qb45detok hlp-show QB45QCK.HLP PRINT --body # one reference topic as text
+qb45detok hlp-dump QB45ADVR.HLP -o docs/    # every topic, one file each
+```
+
+`QB45ADVR.HLP` is the full QuickBASIC 4.5 language reference. Dumping it gives
+about 11,500 lines of plain text, code examples included, which is the whole
+reference in a form you can grep. `docs/quickhelp.md` describes that format.
+
 There are also commands for looking at the format itself:
 
 ```
