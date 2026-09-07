@@ -40,9 +40,10 @@ the format magic.
   QuickBASIC format rather than Text changes this byte to `0x10` and nothing
   else, which is the silent failure mode described in the README.
 - `0x14`–`0x17` — `ff ff 24 00` in all nine. Unknown.
-- `0x18` — `ffff` in seven files; `0x20f0` in `DIRMAST`, `0x07c6` in `STARDEF`.
-  Those are the two files with line numbers and with `DATA` statements. Likely
-  a reference to a line-number or `DATA` table. Unknown.
+- `0x18` — a `DATA` pointer of some kind. **Verified**: it is `ffff` in every
+  program that has no `DATA` statement and non-`ffff` in exactly the two that
+  do. Neither value resolves as a name-table reference, so what it points into
+  is still unknown.
 - `0x1a` — **code reference**: ref of the first code section. **Verified**.
 
 ## Symbol table (`0x1c`–`0x71`)
@@ -124,6 +125,13 @@ with its own name:
     u8   0x00
     ...  name, `length` bytes
     ...  tokens
+
+The preamble's kind byte carries at least one meaning: **bit `0x80` marks a
+`STATIC` procedure**, which holds for all 68 procedures across the corpus. The
+remaining values are `0x30` and `0x38`, differing by bit `0x08`, and every
+`STATIC` procedure has that bit set as well. What it records on its own is not
+known -- it does not track whether the procedure takes parameters, whether it
+is a `FUNCTION` rather than a `SUB`, or whether its header carries `0017`.
 
 **Verified**: these names match the `SUB`/`FUNCTION` names in the text exactly,
 for all nine files, and the sections tile the file from the code reference to
@@ -348,6 +356,9 @@ overall. The one exception is a single line in `DIRMAST` described below.
     split across `length mod 4` in the same proportion as lines without it.
   - **A trailing colon.** Across the whole corpus 117 lines carry `0017`
     without ending in a colon, and exactly one line has both.
+  - **The procedure kind byte.** Bit `0x08` of the preamble kind byte is also
+    unexplained, but the two are independent: all four combinations of
+    "bit set" and "`0017` on the signature line" occur.
 
   What is known: 80 occurrences, in four files only, always last on the line,
   and nearly consistent per procedure -- every mention of `Press.Any.Key` in
