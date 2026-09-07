@@ -22,14 +22,23 @@ from .reader import BinFile
 
 def format_single(words) -> str:
     value = struct.unpack("<f", struct.pack("<HH", *words))[0]
-    return _trim(_shortest(value, single=True))
+    text = _trim(_shortest(value, single=True))
+    # A literal with no decimal point and no exponent would read back as an
+    # integer, so QB marks it single: "180!".
+    if "." not in text and "E" not in text:
+        text += "!"
+    return text
 
 
 def format_double(words) -> str:
     value = struct.unpack("<d", struct.pack("<HHHH", *words))[0]
     text = _trim(_shortest(value, single=False))
-    # QB marks a whole-number double literal with "#", as in FnArea#(2#).
-    return text + "#" if text.lstrip("-").isdigit() else text
+    if "E" in text:
+        # An exponent makes it double by writing D rather than E.
+        return text.replace("E", "D")
+    # Anything else would read back as an integer or a single, so it carries
+    # the "#": "3.141592653#", "2#".
+    return text + "#"
 
 
 def _shortest(value: float, single: bool) -> str:
@@ -40,13 +49,26 @@ def _shortest(value: float, single: bool) -> str:
     form recovers what was written.
     """
     limit = 9 if single else 17
-    for digits in range(1, limit + 1):
-        text = f"{value:.{digits}g}"
+
+    def same(text: str) -> bool:
         back = float(text)
         if single:
             back = struct.unpack("<f", struct.pack("<f", back))[0]
-        if back == value:
-            return text
+        return back == value
+
+    for digits in range(1, limit + 1):
+        text = f"{value:.{digits}g}"
+        if not same(text):
+            continue
+        if "e" in text:
+            # QB writes an exponent only when the fixed form will not do, so
+            # 180 comes back as 180 rather than 1.8E+2.
+            exponent = int(text.split("e")[1])
+            if -5 < exponent < 16:
+                fixed = f"{value:.{max(0, digits - 1 - exponent)}f}"
+                if same(fixed):
+                    return fixed
+        return text
     return repr(value)
 
 
@@ -70,8 +92,8 @@ class RenderError(Exception):
 class Renderer:
     """Renders decoded lines back to source for one file."""
 
-    #: Section kind byte that marks a procedure declared STATIC.
-    STATIC_KIND = 0xB8
+    #: Bit of the procedure preamble kind byte that marks it STATIC.
+    STATIC_KIND = 0x80
 
     #: Trailing word on LINE, giving the box style.
     LINE_SHAPES = {1: "B", 2: "BF"}
@@ -110,7 +132,7 @@ class Renderer:
 
     #: Statements whose arguments are simply everything left on the stack.
     LIST_STATEMENTS = frozenset({
-        "READ", "LINE", "LINE_NOCOLOR", "LINE_TO", "PSET", "PSET_NOCOLOR",
+        "LINE", "LINE_NOCOLOR", "LINE_TO", "PSET", "PSET_NOCOLOR",
         "PRESET", "PRESET_NOCOLOR", "PUT_GRAPHICS", "GET_GRAPHICS",
         "CIRCLE", "CIRCLE_COLOR",
         "PAINT", "WINDOW", "VIEW_PRINT", "SOUND", "PLAY", "BLOAD", "BSAVE",
@@ -118,7 +140,7 @@ class Renderer:
         "BLOAD_ONE",
         "KEY", "PALETTE", "SWAP",
         "RESTORE", "VIEW_PRINT", "ERASE", "DEF_SEG_TO", "FILES", "GET_FILE",
-        "PUT_FILE", "GET_FILE_VAR", "PUT_FILE_VAR", "LOCK", "UNLOCK",
+        "PUT_FILE", "GET_FILE_VAR", "PUT_FILE_VAR",
         "SEEK_STMT", "BSAVE", "PALETTE_USING", "IOCTL", "WAIT_XOR",
     })
 
@@ -181,6 +203,7 @@ class Renderer:
         pending: Optional[str] = None  # a keyword prefixing the next statement
         comment_at: Optional[int] = None
         comment_colon = False  # a colon sits between the code and the comment
+        read_at: Optional[int] = None  # index of the READ being extended
 
         def pop(n: int = 1) -> List[str]:
             if len(stack) < n:
@@ -239,6 +262,14 @@ class Renderer:
                 stack.append(format_double(ins.operands))
             elif op.form == "literal":
                 stack.append(op.text)
+            elif mn in ("SPC", "TAB") and not any(
+                    x.mnemonic in ("PRINT_FUNC_SEMI", "PRINT_FUNC_COMMA")
+                    for x in line.instrs[line.instrs.index(ins) + 1:
+                                         line.instrs.index(ins) + 2]):
+                # SPC and TAB are print items that always carry their own
+                # semicolon; only the PRINT_FUNC form spells it out.
+                printing.append(f"{op.text}({pop()[0]});")
+
             elif op.form == "var" and mn.startswith(("DECL", "ARRDECL")):
                 text = self._declaration(ins, stack, declared_so_far, dim_marks)
                 if declared_type is not None:
@@ -334,6 +365,7 @@ class Renderer:
                 # A colon with nothing after it is written out. The dotted
                 # name marker can sit past it, so look through it.
                 rest = line.instrs[line.instrs.index(ins) + 1:]
+                read_at = None
                 kept = [x for x in rest if x.mnemonic != "DOTTED_NAME"]
                 if not kept:
                     trailing_colon = True
@@ -363,10 +395,18 @@ class Renderer:
             elif mn == "REM_META":
                 # A comment written with the REM keyword rather than "'".
                 emit("REM" + (ins.text or ""))
-            elif mn == "META_DYNAMIC":
+            elif mn in ("META_DYNAMIC", "META_STATIC"):
                 # Supplies the metacommand text for the comment before it.
+                # "' $DYNAMIC" keeps the space the comment stored, which the
+                # usual pad-stripping would have dropped.
                 if parts:
-                    parts[-1] += op.text
+                    before = line.instrs[line.instrs.index(ins) - 1]
+                    gap = ""
+                    if (before.payload
+                            and before.payload.endswith(b" ")
+                            and not parts[-1].endswith(" ")):
+                        gap = " "
+                    parts[-1] += gap + op.text
             elif mn == "DEF_FN":
                 emit("DEF " + self._def_fn(ins))
             elif mn == "DEF_FN_END_LINE":
@@ -452,13 +492,29 @@ class Renderer:
             elif mn == "WIDTH_FILE":
                 argv = pop(len(stack))
                 emit("WIDTH " + ", ".join(argv))
+            elif mn == "GET_FILE_BARE":
+                emit(f"GET {pop()[0]}")
             elif mn in ("GET_FILE_NOREC", "PUT_FILE_NOREC"):
                 # "GET #1, , Rec" -- the record number was left out.
                 argv = pop(len(stack))
                 head = "GET" if mn == "GET_FILE_NOREC" else "PUT"
                 chan = argv[0] if argv else ""
                 emit(f"{head} {chan}, , " + ", ".join(argv[1:]))
-            elif mn == "OPEN_MODE_STRING":
+            elif mn in ("LOCK", "UNLOCK"):
+                # "LOCK #n", "LOCK #n, record", "LOCK #n, first TO last",
+                # and "LOCK #n, TO last" when the first is left out.
+                argv = pop(len(stack))
+                chan = argv[0] if argv else ""
+                rest = argv[1:]
+                if len(rest) == 2:
+                    omitted = any(x.mnemonic == "ARG_OMITTED" for x in line.instrs)
+                    span = f"TO {rest[1]}" if omitted else f"{rest[0]} TO {rest[1]}"
+                    emit(f"{op.text} {chan}, {span}")
+                elif rest:
+                    emit(f"{op.text} {chan}, {rest[0]}")
+                else:
+                    emit(f"{op.text} {chan}")
+            elif mn in ("OPEN_MODE_STRING", "OPEN_MODE_PLAIN"):
                 # The pre-4.0 form, "OPEN mode$, #n, file$[, reclen]", whose
                 # arguments are already in source order.
                 emit(f"OPEN {', '.join(pop(len(stack)))}")
@@ -523,7 +579,14 @@ class Renderer:
                 printing, using, channel = [], None, None
                 print_keyword = "PRINT"
             elif mn == "PRINT_NEWLINE":
-                emit(self._print(printing, using, print_keyword, channel))
+                out_text = self._print(printing, using, print_keyword, channel)
+                # A bare PRINT keeps a space before a following colon, the
+                # way QB writes "PRINT : INPUT ...".
+                if not printing and any(
+                        x.mnemonic == "COLON"
+                        for x in line.instrs[line.instrs.index(ins) + 1:]):
+                    out_text += " "
+                emit(out_text)
                 printing, using, channel = [], None, None
                 print_keyword = "PRINT"
 
@@ -614,7 +677,9 @@ class Renderer:
                     emit("EXIT FUNCTION" if self.section_is_function else "EXIT SUB")
             elif mn in ("SUB", "FUNCTION", "DECLARE"):
                 text = self._signature(ins)
-                if mn != "DECLARE" and self.section_kind == self.STATIC_KIND:
+                static = (self.section_kind is not None
+                          and self.section_kind & self.STATIC_KIND)
+                if mn != "DECLARE" and static:
                     text += " STATIC"
                 emit(text)
             elif mn == "PRINT_USING":
@@ -645,6 +710,34 @@ class Renderer:
                 colour = argv.pop(0) if mn == "LINE_STYLE" and argv else ""
                 shape = self.LINE_SHAPES.get(ins.operands[0], "") if ins.operands else ""
                 emit(f"LINE {coords}, {colour}, {shape}, {style}")
+            elif mn in ("DATE$_SET", "TIME$_SET"):
+                emit(f"{op.text} = {pop()[0]}")
+            elif mn == "READ":
+                # One READ opcode per variable, but QB writes them as a
+                # single statement: "READ A$, B$". A real "READ A: READ B"
+                # has a COLON between them, which clears the run.
+                argv = pop(len(stack)) if stack else []
+                if read_at is not None and read_at < len(parts):
+                    parts[read_at] += ", " + ", ".join(argv)
+                else:
+                    read_at = len(parts)
+                    emit("READ " + ", ".join(argv))
+            elif mn in ("CIRCLE", "CIRCLE_COLOR"):
+                # CIRCLE (x, y), radius[, colour[, start[, end[, aspect]]]].
+                # Any of the optional arguments can be left out, and QB keeps
+                # the empty slots: "CIRCLE (x, y), r, 1, , , .3".
+                argv = self._merge_coords(pop(len(stack)))
+                base = 2 + (1 if mn == "CIRCLE_COLOR" else 0)
+                head, rest = argv[:base], argv[base:]
+                if len(head) < base:
+                    head = head + [""] * (base - len(head))
+                if any(x.mnemonic == "CIRCLE_ASPECT" for x in line.instrs) and rest:
+                    aspect = rest.pop()
+                    rest = rest + [""] * (2 - len(rest)) + [aspect]
+                elif mn == "CIRCLE" and rest:
+                    # No colour was written but arc angles were.
+                    head = head + [""]
+                emit("CIRCLE " + ", ".join(head + rest))
             elif mn in self.LIST_STATEMENTS:
                 argv = pop(len(stack)) if stack else []
                 argv = self._merge_coords(argv)
@@ -664,6 +757,11 @@ class Renderer:
                     action = self.PUT_ACTIONS.get(ins.operands[0])
                     if action:
                         text += f", {action}"
+                # A keyword with no arguments keeps a space before a following
+                # colon, the way QB writes "COLOR : PRINT".
+                if not argv and any(x.mnemonic == "COLON"
+                                    for x in line.instrs[line.instrs.index(ins) + 1:]):
+                    text += " "
                 emit(text)
             elif marks:
                 argv = take_args()
@@ -701,28 +799,42 @@ class Renderer:
         if stack:
             raise RenderError(f"{len(stack)} values left on the stack")
 
+        prefix = self._indent(line.indent)
+        lead = ""
+        if line.labelled:
+            prefix = ""
+            entry = self.bf.symbol(line.label_ref)
+            marker = entry.label if entry else f"{line.label_ref:#06x}"
+            if entry is not None and entry.line_number is None:
+                marker += ":"
+            # The label sits at column 0, and the line's indent is the gap
+            # between it and the statement: "30     PRINT I".
+            lead = marker + " " * max(line.indent, 1)
+
         text = ""
         for i, part in enumerate(parts):
-            if i == 0:
-                text = part
-            elif comment_at is not None and i == len(parts) - 1 and part.startswith("'"):
+            if comment_at is not None and i == len(parts) - 1 and part.startswith("'"):
                 if comment_colon:
                     text += ":"
                 # QB puts the comment at its recorded column even when that
-                # leaves no gap: "... OR 128'S?".
-                text = text.ljust(max(comment_at - line.indent, len(text))) + part
+                # leaves no gap: "... OR 128'S?". A label counts towards the
+                # column too.
+                # A tab counts as eight columns, so measure from the
+                # recorded indent rather than the prefix string.
+                base = len(lead) if line.labelled else line.indent
+                width = comment_at - base
+                text = text.ljust(max(width, len(text))) + part
+            elif i == 0:
+                text = part
             else:
                 text += seps[i - 1] + part
 
         if trailing_colon:
             text += ":"
-        prefix = self._indent(line.indent)
         if line.labelled:
-            entry = self.bf.symbol(line.label_ref)
-            marker = entry.label if entry else f"{line.label_ref:#06x}"
-            if entry is not None and entry.line_number is None:
-                marker += ":"
-            return f"{prefix}{marker}{(' ' + text) if text else ''}"
+            if not text:
+                return prefix + lead.rstrip()
+            return prefix + lead + text
         # Trailing whitespace is kept: a comment can legitimately end in
         # spaces, and a whitespace-only line carries its indentation. The one
         # exception is the space CLS leaves for an argument it did not get,

@@ -51,7 +51,9 @@ class Instr:
             text = tokens.expand_runs(body).decode("latin-1")
             if self.code == tokens.REM and text.endswith(" "):
                 # The payload is padded to an even length with a space, and
-                # QB does not write that pad back out.
+                # QB does not write that pad back out. The exception is a
+                # metacommand, where the space before "$DYNAMIC" is real and
+                # the renderer puts it back.
                 text = text[:-1]
             return text
         if self.op is not None and self.op.form == "literal" and self.payload:
@@ -241,13 +243,7 @@ def decode_section(bf: BinFile, section: Section) -> DecodedSection:
             break
         line = Line(header=w[i], offset=i * 2)
         i += 1
-        if line.header & tokens.LINE_HAS_INDENT:
-            if i >= n:
-                out.truncated = True
-                out.lines.append(line)
-                break
-            line.wide_indent = w[i]
-            i += 1
+        # A line can carry both, and the label pair comes first.
         if line.header & tokens.LINE_HAS_LABEL:
             if i + 1 >= n:
                 out.truncated = True
@@ -255,6 +251,13 @@ def decode_section(bf: BinFile, section: Section) -> DecodedSection:
                 break
             line.label_offset, line.label_ref = w[i], w[i + 1]
             i += 2
+        if line.header & tokens.LINE_HAS_INDENT:
+            if i >= n:
+                out.truncated = True
+                out.lines.append(line)
+                break
+            line.wide_indent = w[i]
+            i += 1
         while i < n:
             code = w[i]
             if tokens.is_line_header(code):

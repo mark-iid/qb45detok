@@ -62,6 +62,12 @@ Then put the two in `corpus/bin/NAME.BAS` and `corpus/txt/NAME.BAS`.
 | `E12.BAS` | nested `TYPE`s, `LSET` between records, string `CONST`, `OPEN` with no `FOR` clause |
 | `E13.BAS` | `DIM SHARED`, `STATIC` and `SHARED` inside a `SUB`, `ERASE`, `TAB`/`SPC` written to a file |
 
+The corpus also holds four batches of the programming examples printed in the
+QuickBASIC 4.5 reference, pulled out of `QB45ADVR.HLP` with `qb45detok
+hlp-dump`. They are Microsoft's code rather than mine, so they are not in
+`samples/`, but they are the best coverage in the corpus: 160 programs written
+by the people who wrote the language.
+
 `TYPES.BAS` is deliberately kept as it is. Its `TYPE` member is called `Name`,
 which QB reads as the `NAME` statement, so the declaration is rejected, and
 `REDIM PRESERVE` does not exist in 4.5 either. QB stores both lines as raw

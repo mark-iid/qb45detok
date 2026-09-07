@@ -270,6 +270,7 @@ _OPS = [
     _op(0x0018, "DIM_ARRAY", (), 0, None, "stmt"),
     # Follows a comment and supplies the metacommand text, which is not
     # stored: "'$DYNAMIC" is an empty REM plus this.
+    _op(0x0021, "META_STATIC", ("u16",), 0, "$STATIC", "stmt"),
     _op(0x0022, "META_DYNAMIC", ("u16",), 0, "$DYNAMIC", "stmt"),
     _op(0x00E2, "READ", (), None, "READ", "stmt"),
     _op(0x001A, "SHARED", (), 0, "SHARED", "stmt"),
@@ -331,6 +332,9 @@ _OPS = [
     _op(0x00AD, "ERROR", (), 1, "ERROR", "stmt"),
     _op(0x00AE, "FILES_BARE", (), 0, "FILES", "stmt"),
     _op(0x00AF, "FILES", (), None, "FILES", "stmt"),
+    # Assigning to DATE$ or TIME$ sets the system clock. Both sit where the
+    # statement table's alphabetical order puts them.
+    _op(0x00A7, "DATE$_SET", (), 1, "DATE$", "stmt"),
     _op(0x00A8, "DEF_SEG", (), 0, "DEF SEG", "stmt"),
     _op(0x00AC, "ERASE", ("u16",), None, "ERASE", "stmt"),
     _op(0x00A9, "DEF_SEG_TO", (), 1, "DEF SEG", "stmt"),
@@ -338,6 +342,7 @@ _OPS = [
     _op(0x00A2, "CLOSE", ("u16",), None, "CLOSE", "stmt"),
     _op(0x00A3, "CLS", (), 0, "CLS", "stmt"),
     _op(0x00A4, "COLOR", ("u16",), None, "COLOR", "stmt"),
+    _op(0x00B0, "GET_FILE_BARE", (), 1, "GET", "stmt"),
     _op(0x00B1, "GET_FILE", (), None, "GET", "stmt"),
     _op(0x00B2, "GET_FILE_NOREC", ("u16",), None, "GET", "stmt"),
     _op(0x00B3, "GET_FILE_VAR", ("u16",), None, "GET", "stmt"),
@@ -366,6 +371,7 @@ _OPS = [
     _op(0x00ED, "SWAP", ("u16",), 2, "SWAP", "stmt"),
     _op(0x00EB, "SLEEP_BARE", (), 0, "SLEEP", "stmt"),
     _op(0x00EC, "SOUND", (), 2, "SOUND", "stmt"),
+    _op(0x00EF, "TIME$_SET", (), 1, "TIME$", "stmt"),
     _op(0x00F0, "TROFF", (), 0, "TROFF", "stmt"),
     _op(0x00F1, "TRON", (), 0, "TRON", "stmt"),
     _op(0x00F2, "UNLOCK", ("u16",), None, "UNLOCK", "stmt"),
@@ -385,6 +391,7 @@ _OPS = [
     _op(0x00C5, "MID_ASSIGN2", (), 3, "MID$", "stmt"),
     _op(0x00C6, "MID_ASSIGN3", (), 4, "MID$", "stmt"),
     _op(0x00FA, "WIDTH_FILE", (), 2, "WIDTH", "stmt"),
+    _op(0x00CB, "OPEN_MODE_PLAIN", (), None, "OPEN", "stmt"),
     _op(0x00CC, "OPEN_MODE_STRING", (), None, "OPEN", "stmt"),
     _op(0x00C9, "OPEN", ("u16",), None, "OPEN", "stmt"),
     # The base is encoded in the opcode rather than an operand.
@@ -440,6 +447,7 @@ _OPS = [
     _op(0x0115, "EOF", (), 1, "EOF", "func"),
     _op(0x0120, "INKEY$", (), 0, "INKEY$", "func"),
     _op(0x0121, "INP", (), 1, "INP", "func"),
+    _op(0x0122, "INPUT$_ONE", (), 1, "INPUT$", "func"),
     _op(0x0123, "INPUT$", (), 2, "INPUT$", "func"),
     _op(0x0124, "INSTR", (), 2, "INSTR", "func"),
     _op(0x0125, "INSTR_FROM", (), 3, "INSTR", "func"),
@@ -505,6 +513,7 @@ _OPS = [
     _op(0x0159, "UCASE$", (), 1, "UCASE$", "func"),
     _op(0x015A, "VAL", (), 1, "VAL", "func"),
     _op(0x0150, "STICK", (), 1, "STICK", "func"),
+    _op(0x0152, "STRIG_FUNC", (), 1, "STRIG", "func"),
     _op(0x0153, "STRING$", (), 2, "STRING$", "func"),
     _op(0x015B, "VARPTR", (), 1, "VARPTR", "func"),
     _op(0x0151, "STR$", (), 1, "STR$", "func"),
