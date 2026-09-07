@@ -309,21 +309,29 @@ QB writes the module text first, then the procedures **sorted by name** --
 not in the order the sections sit in the file. Each section is followed by a
 blank line, unless it already ended with one.
 
-The hidden `DEFtype` record at the head of each procedure is counted as a line
-but never printed, so it has to be dropped when rendering.
+The `DEFtype` record at the head of each procedure is counted as a line but is
+printed only when it *changes* the default type. `TORUS` shows both halves: its
+procedures all carry a copy of the module's `DEFINT A-Z` and stay silent, while
+`TorusCalc` carries no record at all -- meaning the language default -- so QB
+writes `DEFSNG A-Z` before it and `DEFINT A-Z` again before the next one.
+
+A statement written with an optional argument it did not supply keeps the space
+where the argument would have gone. That is why `CLS : END` has a space before
+the colon and `DO: LOOP` does not, and why a lone `CLS` needs its trailing
+space trimmed: QB trims trailing whitespace from a line that has content, but
+leaves it on a line that is only whitespace.
 
 ### Coverage
 
 `src/qb45detok/tokens.py` holds the opcodes identified so far. Against the
-whole corpus that accounts for **99.95% of the 13,507 opcodes**, with **86 of
+whole corpus that accounts for **every one of the 13,527 opcodes**, with **all
 87 sections** decoding to exactly the line count their trailer records and
 decoded indentation matching QB's text output on all 2,562 procedure lines
 that can be checked. `qb45detok stats FILE` reports this per file.
 
-Rendering those tokens back to source reproduces **15 of the 19 corpus files
-byte for byte**, the largest of them 353 lines. The four that do not are the
-biggest, and in each case a single unrendered line shifts everything after it,
-so the line-level figure understates how close they are.
+Rendering those tokens back to source reproduces **18 of the 19 corpus files
+byte for byte**, the largest of them 1,091 lines, and 4,517 of 4,518 lines
+overall. The one exception is a single line in `DIRMAST` described below.
 
 ### Known unknowns
 
@@ -338,16 +346,20 @@ so the line-level figure understates how close they are.
     It gained a resolved jump target and no `0017`.
   - **Padding.** It is always the last word on its line, but lines carrying it
     split across `length mod 4` in the same proportion as lines without it.
-  - **A trailing colon.** Of the 54 procedure lines that carry it, none ends
-    with a colon in the text QB wrote.
+  - **A trailing colon.** Across the whole corpus 117 lines carry `0017`
+    without ending in a colon, and exactly one line has both.
 
   What is known: 80 occurrences, in four files only, always last on the line,
   and nearly consistent per procedure -- every mention of `Press.Any.Key` in
   `DIRMAST` has it and no mention of `ClrKbd` does -- but three procedures in
   `DRAWSCR1` have it on one mention and not another, so it is not simply a
   property of the name.
-- Six opcodes remain unidentified, all with one or two occurrences, and one
-  section still decodes to the wrong line count.
+- One line renders wrong: `IF Attr% AND 16 THEN GOTO Next.Dir:` in `DIRMAST`
+  loses its trailing colon. It is the only line in the corpus that both ends
+  in a colon and carries `0017`, and nothing else in its tokens separates it
+  from the same statement without one.
+- Two `PUT` raster operations, `PRESET` and `AND`, never appear, so their
+  action codes are unknown. The three that do are 0 `OR`, 3 `PSET`, 4 `XOR`.
 - The `DIM ... AS <type>` payload described above.
 - The trailing word on statements like `LOCATE` and `COLOR` is twice the
   argument count, but on `LINE` it is the `B`/`BF` shape flag and on `PUT` the

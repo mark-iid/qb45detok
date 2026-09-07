@@ -19,11 +19,12 @@ pytestmark = requires_corpus
 BYTE_IDENTICAL = [
     "DEFFN.BAS", "DEFTYPE.BAS", "DESCFILE.BAS", "DRAWSCR1.BAS", "FILEIO.BAS",
     "JOHNNY.BAS", "MAINMENU.BAS", "MATTMENU.BAS", "MISC.BAS", "OBJSCAN.BAS",
-    "PHYSICS.BAS", "TRAIL1.BAS", "TRAIL2.BAS", "TYPES.BAS", "TYPES2.BAS",
+    "PHYSICS.BAS", "PROJECT2.BAS", "STARDEF.BAS", "TORUS.BAS", "TRAIL1.BAS",
+    "TRAIL2.BAS", "TYPES.BAS", "TYPES2.BAS",
 ]
 
 #: Lower bound on the share of lines rendered exactly across the corpus.
-MIN_LINE_MATCH = 0.64
+MIN_LINE_MATCH = 0.99
 
 
 def render(name):
@@ -91,7 +92,15 @@ def test_parameter_forms():
     assert any(l.startswith("DECLARE SUB ") and l.endswith(" ()") for l in lines)
 
 
-def test_hidden_deftype_line_is_not_printed():
-    """The DEFtype record copied into each procedure has no source form."""
+def test_deftype_is_written_only_when_it_changes():
+    """The record copied into each procedure is silent unless it differs.
+
+    TORUS declares DEFINT A-Z in the module. Every procedure but TorusCalc
+    carries a copy of that, which is not printed. TorusCalc has no record at
+    all, meaning the language default, so QB writes DEFSNG A-Z before it and
+    DEFINT A-Z again before the next procedure.
+    """
     lines = render("TORUS.BAS")
-    assert lines.count("DEFINT A-Z") == 1
+    assert [l for l in lines if l.startswith("DEF") and l.endswith("A-Z")] == [
+        "DEFINT A-Z", "DEFSNG A-Z", "DEFINT A-Z",
+    ]

@@ -10,6 +10,7 @@ not in the table, and the decoder reports it.
 ``("u16",)``  one literal word
 ``("ref",)``  one symbol reference into the name table
 ``("str",)``  a word count followed by that many bytes, padded to a word
+``("u32",)``  a 32-bit integer held in the next two words
 ``("f32",)``  a 32-bit float held in the next two words
 ``("f64",)``  a 64-bit float held in the next four
 ``("argc", "ref")`` a call: argument count then the procedure
@@ -155,6 +156,7 @@ _OPS = [
     _op(0x0058, "FUNCTION", ("str",), 0, "FUNCTION", "stmt"),
     _op(0x0076, "SUB", ("str",), 0, "SUB", "stmt"),
     # -- literals -----------------------------------------------------
+    _op(0x0166, "PUSH_LONG", ("u32",), 0, None, "literal"),
     _op(0x016B, "PUSH_SINGLE", ("f32",), 0, None, "literal"),
     _op(0x016C, "PUSH_DOUBLE", ("f64",), 0, None, "literal"),
     _op(0x016D, "PUSH_STR", ("str",), 0, None, "literal"),
@@ -207,12 +209,14 @@ _OPS = [
     _op(0x0059, "GOSUB", ("ref",), 0, "GOSUB", "stmt"),
     _op(0x005B, "GOTO", ("ref",), 0, "GOTO", "stmt"),
     _op(0x0063, "LOOP_UNTIL", ("u16",), 1, "LOOP UNTIL", "stmt"),
-    _op(0x0064, "IF_THEN_LINE_ALT", ("u16",), 1, "IF", "stmt"),
+    _op(0x0064, "LOOP_WHILE", ("u16",), 1, "LOOP WHILE", "stmt"),
     _op(0x0057, "FOR_STEP", ("u16", "u16"), None, "FOR", "stmt"),
     _op(0x0062, "LOOP", ("u16",), 0, "LOOP", "stmt"),
+    _op(0x0065, "NEXT_BARE", ("u16", "u16"), 0, "NEXT", "stmt"),
     _op(0x0066, "NEXT", ("u16", "u16"), None, "NEXT", "stmt"),
     _op(0x0067, "ON_ERROR", ("ref",), 0, "ON ERROR GOTO", "stmt"),
     _op(0x006C, "RESUME", (), 0, "RESUME", "stmt"),
+    _op(0x006D, "RESUME_LABEL", ("ref",), 0, "RESUME", "stmt"),
     _op(0x006E, "RESUME_NEXT", (), 0, "RESUME NEXT", "stmt"),
     _op(0x006F, "RETURN", (), 0, "RETURN", "stmt"),
     _op(0x0074, "SELECT_CASE", ("u16",), 1, "SELECT CASE", "stmt"),
@@ -336,6 +340,8 @@ _OPS = [
     _op(0x0107, "ATN", (), 1, "ATN", "func"),
     _op(0x010C, "CSRLIN", (), 0, "CSRLIN", "func"),
     _op(0x0113, "DATE$", (), 0, "DATE$", "func"),
+    _op(0x0118, "ERL", (), 0, "ERL", "func"),
+    _op(0x0119, "ERR", (), 0, "ERR", "func"),
     _op(0x011A, "EXP", (), 1, "EXP", "func"),
     _op(0x011C, "FIX", (), 1, "FIX", "func"),
     _op(0x012F, "LOF", (), 1, "LOF", "func"),
@@ -394,9 +400,14 @@ def convert_op(code: int) -> Optional[Op]:
 
 
 def constant_op(code: int) -> Optional[Op]:
-    """Synthesise the entry for an immediate or literal constant push."""
+    """Synthesise the entry for an immediate or literal constant push.
+
+    Both forms carry a type in the high byte under the same rule, so the high
+    byte has to be checked as well as the low one -- otherwise ``0065``, which
+    is a bare ``NEXT``, gets mistaken for a literal push.
+    """
     low = code & 0xFF
-    if low == LITERAL_LOW_BYTE:
+    if low == LITERAL_LOW_BYTE and (code >> 8) % 4 == 1:
         return _op(code, "PUSH_INT", ("u16",), 0, None, "literal")
     value = immediate_value(code)
     if value is None:

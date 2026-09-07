@@ -223,8 +223,8 @@ def decode_section(bf: BinFile, section: Section) -> DecodedSection:
             instr = Instr(offset=i * 2, code=code, op=op)
             i += 1
             for kind in op.operands if op else ():
-                if kind in ("f32", "f64"):
-                    span = 2 if kind == "f32" else 4
+                if kind in ("u32", "f32", "f64"):
+                    span = 4 if kind == "f64" else 2
                     if i + span > n:
                         out.truncated = True
                         break

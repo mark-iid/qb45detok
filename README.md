@@ -96,13 +96,13 @@ qb45detok stats PROGRAM.BAS        # how much of the token stream is identified
 ## How well it works
 
 Across the nineteen programs I tested it on — my own code, a QuickBASIC sample,
-and some small programs written to exercise one feature each — **fifteen come
+and some small programs written to exercise one feature each — **eighteen come
 back byte for byte identical** to what QuickBASIC itself writes with Save As
-Text. The largest of those is 353 lines.
+Text. The largest of those is 1,091 lines. The nineteenth differs by a single
+character on one line.
 
-Underneath that, the opcode table now covers **99.95%** of the opcodes in those
-programs, and 86 of 87 code sections decode to exactly the line count the file
-records for them.
+Underneath that, every opcode in those programs is identified, and all 87 code
+sections decode to exactly the line count the file records for them.
 
 Nothing is guessed at silently. If the decoder cannot express a statement it
 writes a marker on that line rather than dropping it or inventing something,
@@ -110,14 +110,14 @@ and `detok` exits non-zero so you know to look.
 
 ## Limits
 
-The four programs that do not round-trip exactly are all large, and in each
-case one bad line shifts everything after it, so they look worse than they are.
-What is left:
-
-- Six opcodes are still unidentified, each appearing once or twice.
-- One code section decodes to the wrong line count.
+- One line in one program still comes out wrong. It is
+  `IF Attr% AND 16 THEN GOTO Next.Dir:` and I lose the trailing colon; nothing
+  in the tokens distinguishes it from the same statement without one.
 - Random-access file I/O (`FIELD`, `GET #`, `PUT #`, `LSET`), `CHAIN`, `DRAW`
   and `ON TIMER` never appeared in anything I tested, so they are unhandled.
+  They will show up as marked lines rather than silently wrong output.
+- Two of the five `PUT` raster operations (`PRESET` and `AND`) never appeared
+  either, so their codes are unknown.
 
 `docs/format.md` lists the open questions, including four hypotheses I ruled
 out by experiment so nobody repeats them.

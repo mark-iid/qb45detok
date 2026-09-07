@@ -76,8 +76,9 @@ class Renderer:
     #: Trailing word on LINE, giving the box style.
     LINE_SHAPES = {1: "B", 2: "BF"}
 
-    #: Trailing word on PUT, giving the raster operation.
-    PUT_ACTIONS = {1: "PSET", 2: "PRESET", 3: "PSET", 4: "AND", 5: "OR", 6: "XOR"}
+    #: Trailing word on PUT, giving the raster operation. Only these three
+    #: appear in anything tested; PRESET and AND have not been seen.
+    PUT_ACTIONS = {0: "OR", 3: "PSET", 4: "XOR"}
 
     #: How OPEN's trailing word names the access mode.
     OPEN_MODES = {1: "INPUT", 2: "OUTPUT", 4: "RANDOM", 8: "APPEND", 16: "BINARY"}
@@ -130,6 +131,9 @@ class Renderer:
         declared_col: Optional[int] = None
         pad_col: Optional[int] = None
         decl_heads: List[str] = []
+        # How many entries on the stack are finished declarations rather than
+        # values, so an array's bounds cannot swallow the name before it.
+        declared_so_far = 0
         single_bound = False
         marks: List[bool] = []  # one per ARG: True when a value follows
         channel: Optional[str] = None  # the "#n" a file statement applies to
@@ -185,6 +189,8 @@ class Renderer:
                 stack.append(str(ins.operands[0]))
             elif mn == "PUSH_STR":
                 stack.append('"' + (ins.text or "") + '"')
+            elif mn == "PUSH_LONG":
+                stack.append(str(ins.operands[0] | (ins.operands[1] << 16)))
             elif mn == "PUSH_SINGLE":
                 stack.append(format_single(ins.operands))
             elif mn == "PUSH_DOUBLE":
@@ -192,7 +198,7 @@ class Renderer:
             elif op.form == "literal":
                 stack.append(op.text)
             elif op.form == "var" and mn.startswith(("DECL", "ARRDECL")):
-                text = self._declaration(ins, stack, bool(decl_heads), single_bound)
+                text = self._declaration(ins, stack, declared_so_far, single_bound)
                 single_bound = False
                 if declared_type is not None:
                     # Each name carries its own AS clause: "DIM A AS X, B AS Y".
@@ -201,11 +207,21 @@ class Renderer:
                         pad_col = declared_col
                     declared_type = declared_col = None
                 stack.append(text)
+                declared_so_far = len(stack)
             elif (op.form == "var" and mn.startswith("ARRAY")
                   and (declaring_line or declared_type is not None)):
-                wanted = 1 if single_bound else min(len(stack), 2)
+                # An array declared with empty parentheses has no bounds, and
+                # anything already on the stack belongs to an earlier name.
+                free = len(stack) - declared_so_far
+                if ins.operands[0] == 0:
+                    wanted = 0
+                elif single_bound:
+                    wanted = min(1, free)
+                else:
+                    wanted = min(free, 2)
                 single_bound = False
                 stack.append(self._value(ins, pop, bounds=wanted, declaring=True))
+                declared_so_far = len(stack)
             elif op.form == "var" and mn.startswith(("LOAD", "ARRAY")):
                 stack.append(self._value(ins, pop))
             elif op.form == "var" and mn.startswith(("STORE", "ARRSET")):
@@ -360,13 +376,13 @@ class Renderer:
             elif mn in ("IF_THEN_BLOCK", "ELSEIF"):
                 (cond,) = pop()
                 emit(f"{op.text} {cond} THEN")
-            elif mn in ("IF_THEN_LINE", "IF_THEN_LINE_ALT"):
+            elif mn == "IF_THEN_LINE":
                 (cond,) = pop()
                 emit(f"IF {cond} THEN", sep=" ")
             elif mn == "ELSE" and parts:
                 seps[-1] = " "
                 emit("ELSE", sep=" ")
-            elif mn in ("DO_UNTIL", "DO_WHILE", "LOOP_UNTIL", "WHILE"):
+            elif mn in ("DO_UNTIL", "DO_WHILE", "LOOP_UNTIL", "LOOP_WHILE", "WHILE"):
                 (cond,) = pop()
                 emit(f"{op.text} {cond}")
             elif mn in ("FOR", "FOR_STEP"):
@@ -381,15 +397,28 @@ class Renderer:
             elif mn in ("SELECT_CASE", "CASE", "CASE_IS_EQ", "CASE_IS_LT",
                         "CASE_IS_GT", "CASE_IS_GE"):
                 (value,) = pop()
-                emit(f"{op.text} {value}")
+                if mn == "CASE" and parts and parts[-1].startswith("CASE"):
+                    parts[-1] += f", {value}"   # "CASE 1, 2, 7, 8"
+                else:
+                    emit(f"{op.text} {value}")
             elif mn == "CASE_RANGE":
                 low, high = pop(2)
                 emit(f"CASE {low} TO {high}")
             elif mn == "ON_ERROR":
                 target = ins.operands[0]
                 emit("ON ERROR GOTO " + ("0" if target == 0xFFFF else self.label(target)))
-            elif mn in ("GOTO", "GOSUB"):
+            elif mn in ("GOTO", "GOSUB", "RESUME_LABEL"):
                 emit(f"{op.text} {self.label(ins.operands[0])}")
+            elif mn == "CLS":
+                # CLS takes an optional mode argument. The space where that
+                # argument would go is written even when it is absent, which
+                # is why "CLS : END" has a space and "DO: LOOP" does not; a
+                # trailing one at the end of a line is trimmed below.
+                if stack:
+                    emit(f"CLS {pop()[0]}")
+                else:
+                    emit("CLS " if marks else "CLS")
+                marks = []
             elif mn in ("CALL", "CALL_IMPLICIT"):
                 count = ins.operands[0]
                 argv = pop(count) if count else []
@@ -400,6 +429,8 @@ class Renderer:
                     emit(f"{name} {', '.join(argv)}".rstrip())
             elif mn == "END_SUB":
                 emit("END FUNCTION" if self.section_is_function else "END SUB")
+            elif mn == "EXIT_SUB":
+                emit("EXIT FUNCTION" if self.section_is_function else "EXIT SUB")
             elif mn in ("SUB", "FUNCTION", "DECLARE"):
                 text = self._signature(ins)
                 if mn != "DECLARE" and self.section_kind == self.STATIC_KIND:
@@ -409,6 +440,9 @@ class Renderer:
                 (using,) = pop()
 
             # -- everything else ------------------------------------------
+            elif mn == "WINDOW" and len(stack) == 4:
+                a, b, c, d = pop(4)
+                emit(f"WINDOW ({a}, {b})-({c}, {d})")
             elif mn in self.LIST_STATEMENTS:
                 argv = pop(len(stack)) if stack else []
                 argv = self._merge_coords(argv)
@@ -479,8 +513,9 @@ class Renderer:
                 marker += ":"
             return f"{prefix}{marker}{(' ' + text) if text else ''}"
         # A line with no statements still carries its indentation: QB keeps
-        # the spaces on a whitespace-only line.
-        return prefix + text
+        # the spaces on a whitespace-only line, but trims trailing space from
+        # one that has content.
+        return prefix + text.rstrip() if text.strip() else prefix + text
 
     # -- helpers ---------------------------------------------------------
 
@@ -529,24 +564,24 @@ class Renderer:
             return self.name(ins.operands[0]) + suffix
         return self._subscripted(ins, suffix, pop)
 
-    def _declaration(self, ins: Instr, stack: List[str], in_list: bool,
+    def _declaration(self, ins: Instr, stack: List[str], declared_so_far: int,
                      single_bound: bool = False) -> str:
         """A name being declared, with its bounds if it is an array.
 
-        Inside a DIM-style list the earlier names are already on the stack, so
-        only the values pushed since the last one are this name's bounds. QB
-        writes them as a single upper bound or as ``lo TO hi``.
+        Inside a ``DIM``-style list the names already declared sit on the stack
+        too, so only the values pushed since the last one can be this name's
+        bounds. QB writes them as a single upper bound or as ``lo TO hi``.
         """
         prefix, suffix = self._split(ins.mnemonic)
         if prefix == "DECL":
             return self.name(ins.operands[0]) + suffix
         base = self.name(ins.operands[1]) + suffix
+        free = len(stack) - declared_so_far
+        limit = 0 if ins.operands[0] == 0 else (1 if single_bound else 2)
         bounds: List[str] = []
-        limit = 1 if single_bound else 2
-        while stack and not (in_list and stack[-1].endswith(")")):
+        while stack and free > 0 and len(bounds) < limit:
             bounds.insert(0, stack.pop())
-            if len(bounds) == limit:
-                break
+            free -= 1
         return base + "(" + " TO ".join(bounds) + ")" if bounds else base + "()"
 
     def _subscripted(self, ins: Instr, suffix: str, pop, bounds: Optional[int] = None,
@@ -664,13 +699,44 @@ class Renderer:
         procs = sorted((d for d in sections if not d.section.is_module),
                        key=lambda d: d.section.name.lower())
         out: List[str] = []
+        # QB writes a DEF<type> line whenever the default type changes from
+        # one section to the next. A procedure with no DEFtype record of its
+        # own is back to the language default, which is single precision.
+        current_type = self._deftype_of(modules[0]) if modules else None
         for ds in modules + procs:
-            out.extend(self.section(ds))
+            if not ds.section.is_module:
+                wanted = self._deftype_of(ds) or "DEFSNG A-Z"
+                if current_type is not None and wanted != current_type:
+                    out.append(wanted)
+                    current_type = wanted
+            body = self.section(ds)
+            if ds.section.is_module and procs and self._uses_dynamic(ds):
+                # A module that turned on $DYNAMIC gets a matching $STATIC
+                # written after it, one blank line past its last real line,
+                # and that line stands in for the usual section separator.
+                while body and not body[-1].strip():
+                    body.pop()
+                body += ["", "REM $STATIC"]
+                out.extend(body)
+                continue
+            out.extend(body)
             if out and out[-1].strip():
                 # QB separates sections with a blank line, but does not add
                 # one when the section already ended with blank lines.
                 out.append("")
         return out
+
+    def _deftype_of(self, ds: DecodedSection) -> Optional[str]:
+        """The DEF<type> a section declares, as source, or None."""
+        for line in ds.lines:
+            for ins in line.instrs:
+                if ins.mnemonic == "DEFTYPE":
+                    return self._deftype(ins)
+        return None
+
+    @staticmethod
+    def _uses_dynamic(ds: DecodedSection) -> bool:
+        return any(i.mnemonic == "REM_META" for line in ds.lines for i in line.instrs)
 
     def section(self, ds: DecodedSection) -> List[str]:
         self.section_kind = ds.section.kind_byte
