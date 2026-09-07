@@ -46,11 +46,8 @@ that happening. `TYPES2.BAS` is the corrected version.
 `TRAIL1`/`TRAIL2` and `EDIT1` are experiments rather than coverage. See the
 "Known unknowns" section of `docs/format.md` for what they answered.
 
-The last three are not expected to run usefully -- `SYSTEM.BAS` ends by
-raising an error on purpose. They only need to load and save, so QB tokenizes
-the statements. If QB rejects a line it will store it as text rather than
-tokens, which is itself worth knowing; note it rather than editing it out.
-
-`GRAPHIC2.BAS` matters most of the three. Two of `PUT`'s five raster
-operations, `PRESET` and `AND`, have never appeared in anything tested, so
-their action codes are still unknown.
+The three marked Done have been through QB and are in the corpus. None of them
+is expected to run usefully, `SYSTEM.BAS` ends by raising an error on purpose.
+They only need to load and save so QB tokenizes the statements. If QB rejects a
+line it stores it as text rather than tokens, which is worth knowing; note it
+rather than editing it out.
