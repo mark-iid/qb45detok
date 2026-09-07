@@ -360,6 +360,7 @@ overall. The one exception is a single line in `DIRMAST` described below.
   from the same statement without one.
 - Two `PUT` raster operations, `PRESET` and `AND`, never appear, so their
   action codes are unknown. The three that do are 0 `OR`, 3 `PSET`, 4 `XOR`.
+  `samples/GRAPHIC2.BAS` exercises all five and would settle them.
 - The `DIM ... AS <type>` payload described above.
 - The trailing word on statements like `LOCATE` and `COLOR` is twice the
   argument count, but on `LINE` it is the `B`/`BF` shape flag and on `PUT` the
@@ -377,7 +378,8 @@ The programs in `samples/` closed the rest: file I/O, `DEF FN`,
 `CONST`, `COMMON`, `STATIC`, all five `DEF<type>` ranges, `EXIT FOR`/`EXIT DO`,
 double-precision literals and the numeric function set.
 
-Still unreachable: random-access files (`FIELD`, `GET #`, `PUT #`, `LSET`,
-`RSET`), `CHAIN`, `RUN`, `DRAW`, `ON TIMER`, `IOCTL`, and fixed-length strings
-that QB actually accepts -- `TYPES.BAS` provoked a rejection instead, and
-`samples/TYPES2.BAS` is the corrected retry.
+Still unreachable, with a sample program written for each: random-access files
+and record locking (`samples/FILEOPS.BAS`), the graphics forms including all
+five `PUT` raster operations (`samples/GRAPHIC2.BAS`), and the environment,
+directory, port and error-handling statements (`samples/SYSTEM.BAS`). None of
+those has been through QB yet.
