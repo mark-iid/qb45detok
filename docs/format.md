@@ -470,7 +470,8 @@ their bare form. Functions do the same: `INSTR`, `LBOUND`, `UBOUND`, `MID$`,
 The opcode table is dense enough that the holes in it are a usable map of what
 has not been reached, and working through them is what found most of the
 above. The statement range is now 242 of 256 assigned and the function range
-124 of 128.
+127 of 128, the one hole there being an unused slot rather than a missing
+name.
 
 Both ranges are alphabetical, which is what makes a hole predictable. The
 statement table runs in two alphabetical blocks, `0037`-`007a` for the
@@ -576,9 +577,9 @@ the slot at the position alphabetical order demands, between `PLAY` and
   alphabetical block, and `13`, `14`, `24`, `25`, `30` and `34`-`36` sit in the
   low region that has no alphabetical order to read them by. Handing each to QB
   one at a time, as described above, is the way to finish them.
-  Nine opcodes are identified but produce no display text at all: `0017`, the
-  dotted name marker, `004b`, `0024`, `007b`, `007c`, `0098`, and `008b` to
-  `008e`. Whatever they record, both QB 4.5 and PDS write nothing for them, so
+  Eleven opcodes are identified but produce no display text at all: `0017`,
+  the dotted name marker, `004b`, `0024`, `007b`, `007c`, `0098`, `008b` to
+  `008e`, and `017e` and `017f`. Whatever they record, both QB 4.5 and PDS write nothing for them, so
   ignoring them costs nothing.
 
   Of the unassigned function codes, `0108` is not a missing function at
@@ -586,8 +587,9 @@ the slot at the position alphabetical order demands, between `PLAY` and
   low byte and a high byte one more than a multiple of four. The high byte
   indexes the target type, 1 `CINT` through 4 `CDBL`, and `0108` is index 0,
   meaning no type. `1508` is index 5, `STRING`, and is unused for the same
-  reason. That leaves `017e` and `017f`, past the end of the alphabetical
-  function block, among the operators and markers. `014c` was the third, and
+  reason. `017e` and `017f`, past the end of the alphabetical function block, are
+  transparent: handed one, QB prints whatever was already on the stack and
+  writes nothing of its own. `014c` was the third, and
   it turned out to be `SHELL` used as a function rather than a statement:
   both QB 4.5 and PDS write `PRINT SHELL(1)` for it. The quick reference
   lists `SHELL` only as a statement, so the alphabetical position was the

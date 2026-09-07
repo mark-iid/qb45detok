@@ -302,6 +302,11 @@ _OPS = [
     _op(0x017B, "SLEEP", (), 1, "SLEEP", "stmt"),
     _op(0x017C, "FIXED_STRING", ("u16", "u16", "u16"), 0, "AS STRING *", "stmt"),
     _op(0x017D, "DIM", ("u16",), 0, "DIM", "stmt"),
+    # Both sit past the end of the alphabetical function block and are
+    # transparent: handed one, QB prints the value that was already on
+    # the stack and writes nothing of its own.
+    _op(0x017E, "MARK_7E", (), 0, None, "stmt"),
+    _op(0x017F, "MARK_7F", (), 0, None, "stmt"),
     _op(0x0172, "ARG_OMITTED", (), 0, None, "stmt"),
     _op(0x0173, "ARG", (), 0, None, "stmt"),
     _op(0x0081, "COORD", (), 2, None, "stmt"),
