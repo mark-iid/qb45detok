@@ -245,7 +245,9 @@ _OPS = [
     _op(0x007A, "WHILE", ("u16",), 1, "WHILE", "stmt"),
     # -- statement punctuation ----------------------------------------
     _op(0x0006, "COLON", (), 0, ":", "stmt"),
-    _op(0x0017, "UNKNOWN_17", (), 0, None, "stmt"),
+    # Marks a line that names an identifier containing a period. One per
+    # line, always last, and it produces no text.
+    _op(0x0017, "DOTTED_NAME", (), 0, None, "stmt"),
     _op(0x0018, "DIM_ARRAY", (), 0, None, "stmt"),
     _op(0x00E2, "READ", (), None, "READ", "stmt"),
     _op(0x001A, "SHARED", (), 0, "SHARED", "stmt"),

@@ -32,7 +32,7 @@ every reference in every corpus file resolves to an entry boundary.
     fc 00 01 00 0c 00 81 01 82 01 06 00 01 02 03 04 05 08  ..  ..  ff ff 24 00
      0                                                     12  13
 
-Bytes `0x00`-`0x11` are byte-identical in all nine files. `0xfc` at offset 0 is
+Bytes `0x00`-`0x11` are byte-identical in all 34 files. `0xfc` at offset 0 is
 the format magic.
 
 - `0x12`: `0x10` everywhere except `PROJECT2.BAS`, which has `0x11`. Unknown.
@@ -53,11 +53,11 @@ the format magic.
 
 41 `u16` hash buckets at `0x1c`, each holding the reference of the first name
 entry in its chain, or 0 for an empty bucket. Verified: following every
-bucket chain reaches every name-table entry exactly once, in all nine files.
+bucket chain reaches every name-table entry exactly once, in all 34 files.
 
 - `0x6e`: reference one past the last name entry, i.e. the end of the name
   table. Verified: walking entries from `0x72` lands exactly here.
-- `0x70`: `0x0052` in all nine files, which is the reference of `0x6e` itself.
+- `0x70`: `0x0052` in all 34 files, which is the reference of `0x6e` itself.
   Probably a fixed "end of buckets" marker.
 
 ## Name table (from `0x72`)
@@ -93,7 +93,7 @@ can produce a 6,855-byte file.
 ## Code sections
 
 The module-level text comes first, at `code_ref + 0x1c`, and is preceded by a
-`u16` byte length. Verified: that length is exact in all nine files.
+`u16` byte length. Verified: that length is exact in all 34 files.
 
 Every section is followed by a 16-byte trailer:
 
@@ -135,21 +135,21 @@ with its own name:
     ...  tokens
 
 The preamble's kind byte carries at least one meaning: bit `0x80` marks a
-`STATIC` procedure, which holds for all 68 procedures across the corpus. The
+`STATIC` procedure, which holds for all 73 procedures across the corpus. The
 remaining values are `0x30` and `0x38`, differing by bit `0x08`, and every
 `STATIC` procedure has that bit set as well. What it records on its own is not
 known -- it does not track whether the procedure takes parameters, whether it
 is a `FUNCTION` rather than a `SUB`, or whether its header carries `0017`.
 
 Verified: these names match the `SUB`/`FUNCTION` names in the text exactly,
-for all nine files, and the sections tile the file from the code reference to
+for all 34 files, and the sections tile the file from the code reference to
 EOF with no gaps.
 
 ## Procedure sections in detail
 
 A procedure section starts at the run of comment lines immediately above its
 `SUB`/`FUNCTION` in the source, not at the keyword. Verified: with that
-rule, `line_count` matches the text for every procedure in all nine files --
+rule, `line_count` matches the text for every procedure in all 34 files --
 including `PROJECT2`'s `MarkTest` and `BondCalc`, which look four lines short
 otherwise.
 
@@ -182,7 +182,7 @@ A header is recognisable because no opcode has zero in its low ten bits apart
 from those flags.
 
 Verified: decoded indentation matches the leading spaces of QB's text
-output on all 2,551 procedure lines that can be checked, with no exceptions.
+output on all 2,806 procedure lines that can be checked, with no exceptions.
 That includes lines indented past 32, which only `TORUS` and `PROJECT2`
 contain and which is what exposed the escape in the first place.
 
@@ -217,6 +217,32 @@ Three families are encoded rather than enumerated:
 
 Length-prefixed payloads are padded to a word boundary. String literals are
 padded with the closing `"` rather than a zero.
+
+### The dotted name marker
+
+`0017` is not a statement. It is a one-word trailer on a line that names an
+identifier containing a period, such as `Press.Any.Key` or `A.Var%`. It takes
+no operands, produces no text, and appears exactly once at the end of such a
+line however many dotted names the line uses. It occurs 131 times across the
+corpus, always last on its line and never anywhere else.
+
+A period is ambiguous in QB: `T.xc` is a field of the record `T`, while
+`Press.Any.Key` is one identifier. QB resolves that when it tokenizes, and a
+field access is stored as a field opcode rather than a name, so `TORUS`, which
+uses records throughout, carries no `0017` at all. The marker appears to record
+that the line took the other branch.
+
+Verified with a matched pair, `samples/DOTS.BAS` and `samples/NODOTS.BAS`.
+They are the same program apart from the periods in its identifiers. The
+dotted one carries the marker on exactly the six lines that name one; the
+other carries none at all. `samples/DOTSUB.BAS` extends this to `SUB` and
+`DECLARE` headers and dotted parameters, where the rule holds just as exactly.
+
+All three were loaded from ASCII text and saved, never edited, and their byte
+at `0x13` is `0x10`. That disproves the earlier reading that the marker only
+appears in files touched in the editor: it looked that way only because the
+four corpus files with dotted names happened also to be the four that had been
+edited.
 
 ### Reserved words that are not statements
 
@@ -385,13 +411,13 @@ leaves it on a line that is only whitespace.
 ### Coverage
 
 `src/qb45detok/tokens.py` holds the opcodes identified so far. Against the
-whole corpus that accounts for every one of the 14,069 opcodes, with all 101
+whole corpus that accounts for every one of the 14,129 opcodes, with all 107
 sections decoding to exactly the line count their trailer records and decoded
 indentation matching QB's text output on every procedure line that can be
 checked. `qb45detok stats FILE` reports this per file.
 
-Rendering those tokens back to source reproduces all 31 corpus files byte for
-byte, the largest of them 1,091 lines, and all 4,731 lines overall.
+Rendering those tokens back to source reproduces all 34 corpus files byte for
+byte, the largest of them 1,091 lines, and all 4,773 lines overall.
 
 Cross-checked against the 224 keywords in the QB 4.5 help index, every
 documented statement and function is either an identified opcode or handled by
@@ -401,33 +427,18 @@ that reach the file as ordinary `CALL` targets.
 
 ### Known unknowns
 
-- `0017` appears at the end of some `SUB`, `DECLARE`, `IF ... THEN` and
-  `PRINT ... ;` lines and not others, with no visible difference in the source
-  text. It takes no operands, so it does not affect the walk. Three
-  hypotheses are now ruled out by experiment:
+- `0017` is described above, and for anything tokenized from source the rule
+  is exact. The residue is 13 `SUB` and `DECLARE` header lines in the corpus
+  that name a dotted procedure and carry no marker. Every one of the 13 is in
+  a file that was edited in the QB editor, and none of the freshly loaded
+  probe files shows the behaviour, so the likeliest reading is that the editor
+  regenerates those header lines without re-applying the marker. That is a
+  guess, not a result.
 
-  - Trailing whitespace. QB strips it on load, and `TRAIL1`/`TRAIL2` came
-    out without `0017` on any line despite carrying all four constructs.
-  - A compile artefact. `EDIT1QB.BAS` is the same program after running.
-    It gained a resolved jump target and no `0017`.
-  - Padding. It is always the last word on its line, but lines carrying it
-    split across `length mod 4` in the same proportion as lines without it.
-  - A trailing colon. Across the whole corpus 117 lines carry `0017`
-    without ending in a colon, and exactly one line has both.
-  - The procedure kind byte. Bit `0x08` of the preamble kind byte is also
-    unexplained, but the two are independent: all four combinations of
-    "bit set" and "`0017` on the signature line" occur.
-  - Editing. `0017` only ever appears in files whose byte at `0x13` is `0x51`,
-    meaning they were touched in the editor, so that is necessary. It is not
-    sufficient: loading a program, making a null edit and saving flips `0x13`
-    and changes nothing else at all, and five files with `0x51` carry no
-    `0017` between them.
+  Ruled out by experiment along the way, so nobody repeats them: trailing
+  whitespace, a compile artefact, word padding, a trailing colon, and the
+  procedure preamble kind byte.
 
-  What is known: 80 occurrences, in four files only, always last on the line,
-  and nearly consistent per procedure -- every mention of `Press.Any.Key` in
-  `DIRMAST` has it and no mention of `ClrKbd` does -- but three procedures in
-  `DRAWSCR1` have it on one mention and not another, so it is not simply a
-  property of the name.
 - The `PUT` raster operations are 0 `OR`, 1 `AND`, 2 `PRESET`, 3 `PSET`,
   4 `XOR`. `OPEN`'s trailing word is described below; only bit 16 of its low
   byte and bit `0x08` of its high byte have not been seen.

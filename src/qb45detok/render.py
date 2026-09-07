@@ -317,10 +317,10 @@ class Renderer:
             elif mn == "ARG_OMITTED":
                 marks.append(False)
             elif mn == "COLON":
-                # A colon with nothing after it is written out. 0017 can sit
-                # past it and produces nothing, so look through it.
+                # A colon with nothing after it is written out. The dotted
+                # name marker can sit past it, so look through it.
                 rest = line.instrs[line.instrs.index(ins) + 1:]
-                if all(x.mnemonic == "UNKNOWN_17" for x in rest):
+                if all(x.mnemonic == "DOTTED_NAME" for x in rest):
                     trailing_colon = True
             elif mn == "DIM_ARRAY":
                 single_bound = True
@@ -355,7 +355,7 @@ class Renderer:
             elif mn == "TYPE_MEMBER":
                 decl_heads = [""]
                 stack.append(self.name(ins.operands[0]))
-            elif mn == "UNKNOWN_17":
+            elif mn == "DOTTED_NAME":
                 pass
             elif mn == "LET":
                 pending = "LET"

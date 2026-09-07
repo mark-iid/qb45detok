@@ -44,6 +44,8 @@ Then put the two in `corpus/bin/NAME.BAS` and `corpus/txt/NAME.BAS`.
 | `DECLARE.BAS` | every clause `DECLARE` can carry: `CDECL`, `ALIAS`, `BYVAL`, `SEG`, `AS ANY`, an empty list |
 | `OPENMODE.BAS` | every `ACCESS` and sharing clause `OPEN` takes, plus the pre-4.0 `OPEN "R", #n, ...` form |
 | `RESERVED.BAS` | `SIGNAL` and `LOCAL`, which 4.5 reserves but does not parse |
+| `DOTS.BAS`, `NODOTS.BAS` | the same program with and without periods in its identifiers, which is what the `0017` marker tracks |
+| `DOTSUB.BAS` | the same question for `SUB` and `DECLARE` headers and for dotted parameter names |
 
 `TYPES.BAS` is deliberately kept as it is. Its `TYPE` member is called `Name`,
 which QB reads as the `NAME` statement, so the declaration is rejected, and

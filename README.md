@@ -30,7 +30,7 @@ head -c 1 OLDPROG.BAS | od -An -tx1
 | `f9`, `f1`, `f3` | older Microsoft BASIC | [decode_ms_basic.py] |
 | printable text | already ASCII | nothing to do |
 
-Only the `fc` row is something I have verified myself, across thirty-one files.
+Only the `fc` row is something I have verified myself, across thirty-four files.
 The rest is from those projects' own documentation, and is here so you do not
 waste time on the wrong tool, as I did.
 
@@ -95,12 +95,12 @@ qb45detok stats PROGRAM.BAS        # how much of the token stream is identified
 
 ## How well it works
 
-Across the thirty-one programs I have tested it on (my own code, a QuickBASIC
+Across the thirty-four programs I have tested it on (my own code, a QuickBASIC
 sample, and small programs written to exercise one feature each) **every one
 comes back byte for byte identical** to what QuickBASIC itself writes with
 Save As Text. The largest is 1,091 lines.
 
-Every opcode in those programs is identified, and all 101 code sections decode
+Every opcode in those programs is identified, and all 107 code sections decode
 to exactly the line count the file records for them.
 
 I also checked the opcode table against the 224 keywords in the QuickBASIC 4.5
@@ -115,10 +115,10 @@ and `detok` exits non-zero so you know to look.
 
 ## Limits
 
-- One opcode, `0017`, turns up at the end of some lines and I still do not
-  know what it records. It carries no operands and produces no text, so it
-  costs nothing to ignore. It only ever appears in files that were edited in
-  the QB editor, but editing alone does not produce it.
+- `0017` marks a line that names an identifier with a period in it. The rule
+  is exact for anything QuickBASIC tokenized from source, but 13 `SUB` and
+  `DECLARE` headers in files that were edited in the QB editor lack it. It
+  carries no operands and produces no text, so it costs nothing either way.
 - A statement I have not run through it would show up as a marked line rather
   than silently wrong output.
 
