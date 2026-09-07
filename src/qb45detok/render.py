@@ -76,12 +76,14 @@ class Renderer:
     #: Trailing word on LINE, giving the box style.
     LINE_SHAPES = {1: "B", 2: "BF"}
 
-    #: Trailing word on PUT, giving the raster operation. Only these three
-    #: appear in anything tested; PRESET and AND have not been seen.
-    PUT_ACTIONS = {0: "OR", 3: "PSET", 4: "XOR"}
+    #: Trailing word on PUT, giving the raster operation. All five confirmed.
+    PUT_ACTIONS = {0: "OR", 1: "AND", 2: "PRESET", 3: "PSET", 4: "XOR"}
 
     #: How OPEN's trailing word names the access mode.
-    OPEN_MODES = {1: "INPUT", 2: "OUTPUT", 4: "RANDOM", 8: "APPEND", 16: "BINARY"}
+    OPEN_MODES = {1: "INPUT", 2: "OUTPUT", 4: "RANDOM", 8: "APPEND", 32: "BINARY"}
+
+    #: The event selector opcodes render as KEY(n), STRIG(n), TIMER(n).
+    EVENT_TEXT = {"STRIG_EVENT": "STRIG", "KEY_EVENT": "KEY", "TIMER_SELECT": "TIMER"}
 
     #: Statements whose arguments are simply everything left on the stack.
     LIST_STATEMENTS = frozenset({
@@ -90,7 +92,9 @@ class Renderer:
         "PAINT", "WINDOW", "VIEW_PRINT", "SOUND", "PLAY", "BLOAD", "BSAVE",
         "SHELL", "KILL", "ERASE", "RANDOMIZE", "WIDTH", "DEF_SEG_TO",
         "KEY", "PALETTE", "SWAP",
-        "RESTORE", "VIEW_PRINT", "ERASE", "DEF_SEG_TO",
+        "RESTORE", "VIEW_PRINT", "ERASE", "DEF_SEG_TO", "FILES", "GET_FILE",
+        "PUT_FILE", "GET_FILE_VAR", "PUT_FILE_VAR", "LOCK", "UNLOCK",
+        "SEEK_STMT", "BSAVE", "PALETTE_USING",
     })
 
     #: Statements that introduce a list of declarations written after them.
@@ -137,6 +141,7 @@ class Renderer:
         single_bound = False
         marks: List[bool] = []  # one per ARG: True when a value follows
         channel: Optional[str] = None  # the "#n" a file statement applies to
+        field_channel: Optional[str] = None
         print_keyword = "PRINT"
         input_prompt: Optional[str] = None
         default_sep = ": "
@@ -189,6 +194,8 @@ class Renderer:
                 stack.append(str(ins.operands[0]))
             elif mn == "PUSH_STR":
                 stack.append('"' + (ins.text or "") + '"')
+            elif mn == "PUSH_HEX":
+                stack.append("&H%X" % ins.operands[0])
             elif mn == "PUSH_LONG":
                 stack.append(str(ins.operands[0] | (ins.operands[1] << 16)))
             elif mn == "PUSH_SINGLE":
@@ -238,18 +245,31 @@ class Renderer:
             elif mn == "PAREN":
                 (inner,) = pop()
                 stack.append(f"({inner})")
-            elif mn in ("STRIG_EVENT", "KEY_EVENT"):
+            elif mn == "TIMER_EVENT":
+                stack.append("TIMER")
+            elif mn in ("CIRCLE_START", "CIRCLE_END", "CIRCLE_ASPECT"):
+                pass  # markers around CIRCLE's optional arguments
+            elif mn in ("LSET", "RSET"):
+                value, target = pop(2)
+                emit(f"{op.text} {target} = {value}")
+            elif mn == "FIELD_STMT":
+                (field_channel,) = pop()
+            elif mn == "FIELD_ITEM":
+                width, target = pop(2)
+                stack.append(f"{width} AS {target}")
+            elif mn in ("STRIG_EVENT", "KEY_EVENT", "TIMER_SELECT"):
                 (which,) = pop()
-                stack.append(f"{op.text}({which})")
+                stack.append(f"{self.EVENT_TEXT[mn]}({which})")
             elif mn in ("EVENT_ON", "EVENT_OFF", "EVENT_STOP"):
                 (event,) = pop()
                 emit(f"{event} {op.text}")
             elif mn == "ON_EVENT_GOSUB":
                 (event,) = pop()
                 emit(f"ON {event} GOSUB {self.label(ins.operands[0])}")
-            elif mn in ("COORD", "COORD_TO", "COORD_STEP"):
+            elif mn in ("COORD", "COORD_TO", "COORD_STEP", "COORD_TO_STEP"):
                 x, y = pop(2)
-                lead = {"COORD": "", "COORD_TO": "-", "COORD_STEP": "STEP"}[mn]
+                lead = {"COORD": "", "COORD_TO": "-", "COORD_STEP": "STEP",
+                        "COORD_TO_STEP": "-STEP"}[mn]
                 stack.append(f"{lead}({x}, {y})")
 
             # -- operators ------------------------------------------------
@@ -331,6 +351,13 @@ class Renderer:
                 print_keyword = "LPRINT"
             elif mn == "PRINT_FILE":
                 (channel,) = pop()
+            elif mn == "OPEN_RANDOM":
+                argv = pop(len(stack))
+                mode = self.OPEN_MODES.get(ins.operands[0] if ins.operands else 4, "RANDOM")
+                target, chan = argv[0], argv[1]
+                length = argv[2] if len(argv) > 2 else None
+                text = f"OPEN {target} FOR {mode} AS {chan}"
+                emit(text + (f" LEN = {length}" if length else ""))
             elif mn == "OPEN":
                 argv = pop(len(stack))
                 mode = self.OPEN_MODES.get(ins.operands[0] if ins.operands else 0)
@@ -440,9 +467,17 @@ class Renderer:
                 (using,) = pop()
 
             # -- everything else ------------------------------------------
-            elif mn == "WINDOW" and len(stack) == 4:
+            elif mn == "NAME" and len(stack) == 2:
+                a, b = pop(2)
+                emit(f"NAME {a} AS {b}")
+            elif mn == "VIEW" and len(stack) >= 4:
+                argv = pop(len(stack))
+                head = f"({argv[0]}, {argv[1]})-({argv[2]}, {argv[3]})"
+                rest = argv[4:]
+                emit(("VIEW " + ", ".join([head] + rest)).rstrip())
+            elif mn in ("WINDOW", "WINDOW_SCREEN") and len(stack) == 4:
                 a, b, c, d = pop(4)
-                emit(f"WINDOW ({a}, {b})-({c}, {d})")
+                emit(f"{op.text} ({a}, {b})-({c}, {d})")
             elif mn in self.LIST_STATEMENTS:
                 argv = pop(len(stack)) if stack else []
                 argv = self._merge_coords(argv)
@@ -475,6 +510,8 @@ class Renderer:
             else:
                 raise RenderError(f"no rendering for {mn}")
 
+        if field_channel is not None and stack:
+            emit(f"FIELD {field_channel}, " + ", ".join(pop(len(stack))))
         if printing or using:
             emit(self._print(printing, using, print_keyword, channel))
         if decl_heads and stack:
@@ -525,7 +562,7 @@ class Renderer:
         """``-(x, y)`` belongs to the coordinate before it, not after a comma."""
         out: List[str] = []
         for item in argv:
-            if item.startswith("-(") and out:
+            if item.startswith(("-(", "-STEP(")) and out:
                 out[-1] += item
             else:
                 out.append(item)

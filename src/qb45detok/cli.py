@@ -117,7 +117,7 @@ def cmd_lines(args) -> int:
             label = ""
             if line.labelled:
                 entry = bf.symbol(line.label_ref)
-                label = f"{entry.label if entry else line.label_ref:#06x} "
+                label = f"{entry.label if entry else f'{line.label_ref:#06x}'} "
             body = " ".join(_render(bf, ins) for ins in line.instrs)
             print(f"{n:>5} |{'':<{line.indent}} {label}{body}")
     return 0

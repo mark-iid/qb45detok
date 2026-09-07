@@ -31,9 +31,9 @@ Then put the two in `corpus/bin/NAME.BAS` and `corpus/txt/NAME.BAS`.
 | `TYPES.BAS` | `TYPE` with a fixed-length string, arrays of a user type, `REDIM PRESERVE` |
 | `TYPES2.BAS` | the same without the two constructs QB 4.5 rejects (see below) |
 | `MISC.BAS` | `SGN` `SQR` `EXP` `LOG` `ATN` `TAN` `FIX` `CINT` `CLNG` `CSNG` `CDBL` `DATE$` `TIME$` `UCASE$` `OCT$`, `BEEP`, `EXIT FOR`, `EXIT DO` |
-| `FILEOPS.BAS` | random access: `FIELD`, `GET #`, `PUT #`, `LSET`, `RSET`, `LOCK`, `UNLOCK`, `SEEK`, `LOC`, and `FOR BINARY` |
-| `GRAPHIC2.BAS` | `PUT` with all five raster operations, `STEP` coordinates, `CIRCLE` arcs, `DRAW`, `PAINT`, `VIEW`, `WINDOW SCREEN`, `PMAP` |
-| `SYSTEM.BAS` | `CLEAR`, `FILES`, `CHDIR`/`MKDIR`/`RMDIR`/`NAME`, `ENVIRON`, `POKE`/`PEEK`/`INP`/`OUT`/`WAIT`, `ON TIMER`, `ERROR`, `RESUME NEXT`, `PALETTE USING` |
+| `FILEOPS.BAS` | random access: `FIELD`, `GET #`, `PUT #`, `LSET`, `RSET`, `LOCK`, `UNLOCK`, `SEEK`, `LOC`, and `FOR BINARY`. Done |
+| `GRAPHIC2.BAS` | `PUT` with all five raster operations, `STEP` coordinates, `CIRCLE` arcs, `DRAW`, `PAINT`, `VIEW`, `WINDOW SCREEN`, `PMAP`. Done |
+| `SYSTEM.BAS` | `CLEAR`, `FILES`, `CHDIR`/`MKDIR`/`RMDIR`/`NAME`, `ENVIRON`, `POKE`/`PEEK`/`INP`/`OUT`/`WAIT`, `ON TIMER`, `ERROR`, `RESUME NEXT`, `PALETTE USING`. Done |
 | `TRAIL1.BAS`, `TRAIL2.BAS` | identical but for trailing whitespace |
 | `EDIT1.BAS` | same program as `TRAIL1`, for saving after a run |
 

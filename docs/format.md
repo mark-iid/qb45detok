@@ -97,6 +97,7 @@ Every section is followed by a 16-byte trailer:
     u32  line_count   source lines in the section
     u16  unknown
     u16  kind         0x0102 for the module text, 0x0c02 for a procedure
+                      (one procedure in the corpus reads 0x0402 instead)
 
 Those first four words are often all `0xff`, which made them look like a
 signature worth scanning for. They are not: in `TORUS` most trailers read
@@ -370,9 +371,9 @@ overall. The one exception is a single line in `DIRMAST` described below.
   loses its trailing colon. It is the only line in the corpus that both ends
   in a colon and carries `0017`, and nothing else in its tokens separates it
   from the same statement without one.
-- Two `PUT` raster operations, `PRESET` and `AND`, never appear, so their
-  action codes are unknown. The three that do are 0 `OR`, 3 `PSET`, 4 `XOR`.
-  `samples/GRAPHIC2.BAS` exercises all five and would settle them.
+- The `PUT` raster operations are 0 `OR`, 1 `AND`, 2 `PRESET`, 3 `PSET`,
+  4 `XOR`. `OPEN` modes are 1 `INPUT`, 2 `OUTPUT`, 4 `RANDOM`, 8 `APPEND`,
+  32 `BINARY`; 16 has not been seen.
 - The `DIM ... AS <type>` payload described above.
 - The trailing word on statements like `LOCATE` and `COLOR` is twice the
   argument count, but on `LINE` it is the `B`/`BF` shape flag and on `PUT` the
@@ -390,8 +391,8 @@ The programs in `samples/` closed the rest: file I/O, `DEF FN`,
 `CONST`, `COMMON`, `STATIC`, all five `DEF<type>` ranges, `EXIT FOR`/`EXIT DO`,
 double-precision literals and the numeric function set.
 
-Still unreachable, with a sample program written for each: random-access files
-and record locking (`samples/FILEOPS.BAS`), the graphics forms including all
-five `PUT` raster operations (`samples/GRAPHIC2.BAS`), and the environment,
-directory, port and error-handling statements (`samples/SYSTEM.BAS`). None of
-those has been through QB yet.
+`samples/FILEOPS.BAS`, `samples/GRAPHIC2.BAS` and `samples/SYSTEM.BAS` have
+since been through QB and are in the corpus, which is where random access,
+record locking, the graphics forms, the directory and port statements and the
+error-handling statements came from. `CHAIN`, `RUN` and `IOCTL` are still
+unreached.

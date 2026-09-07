@@ -46,7 +46,7 @@ def procedures_in_text(text):
 
 
 def test_corpus_is_present():
-    assert len(NAMES) == 19, "expected nineteen matched pairs in corpus/"
+    assert len(NAMES) == 22, "expected twenty-two matched pairs in corpus/"
 
 
 def test_parses(pair):
@@ -122,9 +122,15 @@ def test_procedure_line_counts_match_the_text(pair):
 
 
 def test_section_kind_word_separates_module_from_procedures(pair):
+    """The module text is 0x0102; a procedure is something else.
+
+    Procedures are almost always 0x0c02. SYSTEM.BAS has one at 0x0402 and
+    nothing else in the corpus does, so the rest of that word is not pinned
+    down yet.
+    """
     _, bf, _ = pair
     assert bf.sections[0].trailer.kind == 0x0102
-    assert all(s.trailer.kind == 0x0C02 for s in bf.sections[1:])
+    assert all(s.trailer.kind != 0x0102 for s in bf.sections[1:])
 
 
 def test_procedure_names_are_also_in_the_name_table(pair):

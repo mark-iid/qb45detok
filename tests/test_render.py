@@ -18,13 +18,14 @@ pytestmark = requires_corpus
 #: renderer improves; removing one is a regression.
 BYTE_IDENTICAL = [
     "DEFFN.BAS", "DEFTYPE.BAS", "DESCFILE.BAS", "DRAWSCR1.BAS", "FILEIO.BAS",
-    "JOHNNY.BAS", "MAINMENU.BAS", "MATTMENU.BAS", "MISC.BAS", "OBJSCAN.BAS",
-    "PHYSICS.BAS", "PROJECT2.BAS", "STARDEF.BAS", "TORUS.BAS", "TRAIL1.BAS",
-    "TRAIL2.BAS", "TYPES.BAS", "TYPES2.BAS",
+    "FILEOPS.BAS", "GRAPHIC2.BAS", "JOHNNY.BAS", "MAINMENU.BAS", "MATTMENU.BAS",
+    "MISC.BAS", "OBJSCAN.BAS", "PHYSICS.BAS", "PROJECT2.BAS", "STARDEF.BAS",
+    "SYSTEM.BAS", "TORUS.BAS", "TRAIL1.BAS", "TRAIL2.BAS", "TYPES.BAS",
+    "TYPES2.BAS",
 ]
 
 #: Lower bound on the share of lines rendered exactly across the corpus.
-MIN_LINE_MATCH = 0.99
+MIN_LINE_MATCH = 0.999
 
 
 def render(name):
