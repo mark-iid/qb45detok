@@ -34,6 +34,8 @@ Then put the two in `corpus/bin/NAME.BAS` and `corpus/txt/NAME.BAS`.
 | `FILEOPS.BAS` | random access: `FIELD`, `GET #`, `PUT #`, `LSET`, `RSET`, `LOCK`, `UNLOCK`, `SEEK`, `LOC`, and `FOR BINARY`. Done |
 | `GRAPHIC2.BAS` | `PUT` with all five raster operations, `STEP` coordinates, `CIRCLE` arcs, `DRAW`, `PAINT`, `VIEW`, `WINDOW SCREEN`, `PMAP`. Done |
 | `SYSTEM.BAS` | `CLEAR`, `FILES`, `CHDIR`/`MKDIR`/`RMDIR`/`NAME`, `ENVIRON`, `POKE`/`PEEK`/`INP`/`OUT`/`WAIT`, `ON TIMER`, `ERROR`, `RESUME NEXT`, `PALETTE USING`. Done |
+| `CHAINRUN.BAS` | `CHAIN`, `RUN` in both forms, `IOCTL` and `IOCTL$`. Done |
+| `MISC2.BAS` | `CVI`/`CVS`/`CVD` and `MKI$`/`MKS$`/`MKD$`, `TRON`, `TROFF`, `SPC`, `TAB`, `POS`, `LPOS`, `FRE`, `SLEEP`, `RESET`, `KEY LIST`, `WIDTH LPRINT`. Done |
 | `COLON1.BAS`, `COLON2.BAS` | identical but for a trailing colon after GOTO. Done |
 | `TRAIL1.BAS`, `TRAIL2.BAS` | identical but for trailing whitespace |
 | `EDIT1.BAS` | same program as `TRAIL1`, for saving after a run |

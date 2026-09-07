@@ -363,6 +363,11 @@ overall. The one exception is a single line in `DIRMAST` described below.
   - The procedure kind byte. Bit `0x08` of the preamble kind byte is also
     unexplained, but the two are independent: all four combinations of
     "bit set" and "`0017` on the signature line" occur.
+  - Editing. `0017` only ever appears in files whose byte at `0x13` is `0x51`,
+    meaning they were touched in the editor, so that is necessary. It is not
+    sufficient: loading a program, making a null edit and saving flips `0x13`
+    and changes nothing else at all, and five files with `0x51` carry no
+    `0017` between them.
 
   What is known: 80 occurrences, in four files only, always last on the line,
   and nearly consistent per procedure -- every mention of `Press.Any.Key` in
@@ -389,8 +394,8 @@ The programs in `samples/` closed the rest: file I/O, `DEF FN`,
 `CONST`, `COMMON`, `STATIC`, all five `DEF<type>` ranges, `EXIT FOR`/`EXIT DO`,
 double-precision literals and the numeric function set.
 
-`samples/FILEOPS.BAS`, `samples/GRAPHIC2.BAS` and `samples/SYSTEM.BAS` have
-since been through QB and are in the corpus, which is where random access,
-record locking, the graphics forms, the directory and port statements and the
-error-handling statements came from. `CHAIN`, `RUN` and `IOCTL` are still
-unreached.
+Everything in `samples/` has been through QB and is in the corpus. That is
+where random access, record locking, the graphics forms, the directory, port
+and error-handling statements, `CHAIN`, `RUN`, `IOCTL`, the record conversion
+functions and the tracing statements came from. Nothing in the language is
+known to be unreached, though that is not the same as saying nothing is.

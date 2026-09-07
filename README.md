@@ -95,12 +95,12 @@ qb45detok stats PROGRAM.BAS        # how much of the token stream is identified
 
 ## How well it works
 
-Across the twenty-four programs I have tested it on (my own code, a QuickBASIC
+Across the twenty-six programs I have tested it on (my own code, a QuickBASIC
 sample, and small programs written to exercise one feature each) **every one
 comes back byte for byte identical** to what QuickBASIC itself writes with
 Save As Text. The largest is 1,091 lines.
 
-Every opcode in those programs is identified, and all 93 code sections decode
+Every opcode in those programs is identified, and all 95 code sections decode
 to exactly the line count the file records for them.
 
 Nothing is guessed at silently. If the decoder cannot express a statement it
@@ -109,11 +109,12 @@ and `detok` exits non-zero so you know to look.
 
 ## Limits
 
-- `CHAIN`, `RUN` and `IOCTL` have not appeared in anything I have run through
-  it. They would show up as marked lines rather than silently wrong output.
 - One opcode, `0017`, turns up at the end of some lines and I still do not
   know what it records. It carries no operands and produces no text, so it
-  costs nothing to ignore.
+  costs nothing to ignore. It only ever appears in files that were edited in
+  the QB editor, but editing alone does not produce it.
+- A statement I have not run through it would show up as a marked line rather
+  than silently wrong output.
 
 `docs/format.md` lists the open questions, including four hypotheses I ruled
 out by experiment so nobody repeats them.

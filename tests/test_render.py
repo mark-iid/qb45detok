@@ -17,12 +17,12 @@ pytestmark = requires_corpus
 #: Every file in the corpus reproduces QB's text output byte for byte.
 #: Removing one from this list is a regression.
 BYTE_IDENTICAL = [
-    "COLON1.BAS", "COLON2.BAS", "DEFFN.BAS", "DEFTYPE.BAS", "DESCFILE.BAS",
-    "DIRMAST.BAS", "DRAWSCR1.BAS", "FILEIO.BAS", "FILEOPS.BAS",
-    "GRAPHIC2.BAS", "JOHNNY.BAS", "MAINMENU.BAS", "MATTMENU.BAS",
-    "MISC.BAS", "OBJSCAN.BAS", "PHYSICS.BAS", "PROJECT2.BAS",
-    "STARDEF.BAS", "SYSTEM.BAS", "TORUS.BAS", "TRAIL1.BAS", "TRAIL2.BAS",
-    "TYPES.BAS", "TYPES2.BAS",
+    "CHAINRUN.BAS", "COLON1.BAS", "COLON2.BAS", "DEFFN.BAS", "DEFTYPE.BAS",
+    "DESCFILE.BAS", "DIRMAST.BAS", "DRAWSCR1.BAS", "FILEIO.BAS",
+    "FILEOPS.BAS", "GRAPHIC2.BAS", "JOHNNY.BAS", "MAINMENU.BAS",
+    "MATTMENU.BAS", "MISC.BAS", "MISC2.BAS", "OBJSCAN.BAS", "PHYSICS.BAS",
+    "PROJECT2.BAS", "STARDEF.BAS", "SYSTEM.BAS", "TORUS.BAS", "TRAIL1.BAS",
+    "TRAIL2.BAS", "TYPES.BAS", "TYPES2.BAS",
 ]
 
 #: Lower bound on the share of lines rendered exactly across the corpus.

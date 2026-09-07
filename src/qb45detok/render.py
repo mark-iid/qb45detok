@@ -82,6 +82,9 @@ class Renderer:
     #: How OPEN's trailing word names the access mode.
     OPEN_MODES = {1: "INPUT", 2: "OUTPUT", 4: "RANDOM", 8: "APPEND", 32: "BINARY"}
 
+    #: KEY's mode word: OFF, ON or LIST.
+    KEY_MODES = {0: "OFF", 1: "ON", 2: "LIST"}
+
     #: The event selector opcodes render as KEY(n), STRIG(n), TIMER(n).
     EVENT_TEXT = {"STRIG_EVENT": "STRIG", "KEY_EVENT": "KEY", "TIMER_SELECT": "TIMER"}
 
@@ -94,7 +97,7 @@ class Renderer:
         "KEY", "PALETTE", "SWAP",
         "RESTORE", "VIEW_PRINT", "ERASE", "DEF_SEG_TO", "FILES", "GET_FILE",
         "PUT_FILE", "GET_FILE_VAR", "PUT_FILE_VAR", "LOCK", "UNLOCK",
-        "SEEK_STMT", "BSAVE", "PALETTE_USING",
+        "SEEK_STMT", "BSAVE", "PALETTE_USING", "IOCTL",
     })
 
     #: Statements that introduce a list of declarations written after them.
@@ -245,6 +248,8 @@ class Renderer:
             elif mn == "PAREN":
                 (inner,) = pop()
                 stack.append(f"({inner})")
+            elif mn == "KEY_MODE":
+                emit("KEY " + self.KEY_MODES.get(ins.operands[0], str(ins.operands[0])))
             elif mn == "TIMER_EVENT":
                 stack.append("TIMER")
             elif mn in ("CIRCLE_START", "CIRCLE_END", "CIRCLE_ASPECT"):
@@ -374,7 +379,8 @@ class Renderer:
                 (channel,) = pop()
             elif mn == "INPUT_VARS_END":
                 argv = pop(len(stack))
-                emit(f"LINE INPUT {channel}, {', '.join(argv)}")
+                head = f"LINE INPUT {channel}, " if channel else "LINE INPUT "
+                emit(head + ", ".join(argv))
                 channel = None
             elif mn == "INPUT_PROMPT":
                 (input_prompt,) = pop()
@@ -387,6 +393,9 @@ class Renderer:
                 input_prompt = None
 
             # -- PRINT ----------------------------------------------------
+            elif mn == "PRINT_FUNC_SEMI":
+                (value,) = pop()
+                printing.append(value + ";")
             elif mn in ("PRINT_SEMI", "PRINT_COMMA"):
                 (value,) = pop()
                 printing.append(value + (";" if mn == "PRINT_SEMI" else ","))
@@ -436,7 +445,7 @@ class Renderer:
             elif mn == "ON_ERROR":
                 target = ins.operands[0]
                 emit("ON ERROR GOTO " + ("0" if target == 0xFFFF else self.label(target)))
-            elif mn in ("GOTO", "GOSUB", "RESUME_LABEL"):
+            elif mn in ("GOTO", "GOSUB", "RESUME_LABEL", "RUN_LINE"):
                 emit(f"{op.text} {self.label(ins.operands[0])}")
             elif mn == "CLS":
                 # CLS takes an optional mode argument. The space where that
