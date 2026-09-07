@@ -305,8 +305,13 @@ _OPS = [
     # Both sit past the end of the alphabetical function block and are
     # transparent: handed one, QB prints the value that was already on
     # the stack and writes nothing of its own.
-    _op(0x017E, "MARK_7E", (), 0, None, "stmt"),
-    _op(0x017F, "MARK_7F", (), 0, None, "stmt"),
+    # A "lo TO hi" range. PDS given this with two values on the stack writes
+    # "1 TO 1"; QuickBASIC 4.5 writes nothing, and matching 4.5 is the
+    # contract here, so it stays silent.
+    _op(0x017E, "TO_RANGE", (), 0, None, "stmt"),
+    # BASIC 7 PDS writes CHDRIVE for this one. QuickBASIC 4.5 writes
+    # nothing, and matching 4.5 is the contract here, so it stays silent.
+    _op(0x017F, "CHDRIVE_PDS", (), 0, None, "stmt"),
     _op(0x0172, "ARG_OMITTED", (), 0, None, "stmt"),
     _op(0x0173, "ARG", (), 0, None, "stmt"),
     _op(0x0081, "COORD", (), 2, None, "stmt"),

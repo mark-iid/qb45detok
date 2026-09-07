@@ -114,7 +114,9 @@ comes back byte for byte identical** to what QuickBASIC itself writes with
 Save As Text. The largest is 2,386 lines.
 
 Every opcode in those programs is identified, and all 253 code sections decode
-to exactly the line count the file records for them.
+to exactly the line count the file records for them. Writing the format back
+out is a stronger check than reading it, and the writer rebuilds all 57 files
+byte for byte from their own decoded structure.
 
 I also checked the opcode table against the 224 keywords in the QuickBASIC 4.5
 help index. Every documented statement and function is covered. The only index
@@ -128,12 +130,23 @@ and `detok` exits non-zero so you know to look.
 
 ## Limits
 
-- `0017` marks a line that names an identifier with a period in it. The rule
-  is exact for anything QuickBASIC tokenized from source, but 13 `SUB` and
-  `DECLARE` headers in files that were edited in the QB editor lack it. It
-  carries no operands and produces no text, so it costs nothing either way.
 - A statement I have not run through it would show up as a marked line rather
-  than silently wrong output.
+  than silently wrong output. That is the main thing to know: the tool fails
+  loudly rather than quietly.
+- Fourteen of the 256 statement opcodes are still unidentified, but most of
+  them are not missing statements. Nine are the line-header values, which
+  cannot be statements at all; two more behave the same way, sending QB into
+  a loop when it is handed one. That leaves three: two that write only a
+  colon, and one that neither QuickBASIC 4.5 nor BASIC 7 will render. The one
+  unassigned function code is an unused slot in the type-conversion family
+  rather than a missing name.
+- A handful of statement forms are stored identically and cannot be told
+  apart. `LOCK #1, TO 32` and `LOCK #1, 1 TO 32` produce the same tokens, so
+  the first comes back as the second.
+- Only QuickBASIC 4.5 is tested. I have no QuickBASIC 4.0 files, so what that
+  version writes is untested rather than known. BASIC 7 PDS files are also
+  untested, though PDS reads 4.5 files correctly, and its editor was useful
+  for identifying two opcodes 4.5 knows about but will not print.
 
 `docs/format.md` lists the open questions, including the hypotheses I ruled out
 by experiment so nobody repeats them, and how to ask QuickBASIC itself what an

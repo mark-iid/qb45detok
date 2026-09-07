@@ -484,10 +484,11 @@ for everything else (BEEP through WRITE). Functions run in one block from
 `00ef` had to be `TIME$` because it sits between `SYSTEM` and `TROFF`. Both
 turned out to be right.
 
-Four of the remaining statement holes cannot be opcodes at all: `0000`, `0001`,
-`0004` and `0005` are values the decoder has to read as a line header, so no
-statement can use them. That leaves 33 genuinely unassigned, listed at the end
-of this section.
+Nine of the remaining statement holes cannot be opcodes at all: everything
+below `000a` is line-header space, which the decoder has to read as such and
+which sends QB into a loop if it is handed one as a statement. `0013` and
+`0014` behave the same way. That leaves three genuinely unassigned, and
+"Known unknowns" below says what is known about each.
 
 ### Asking QB directly
 
@@ -533,67 +534,82 @@ the slot at the position alphabetical order demands, between `PLAY` and
 
 ### Known unknowns
 
-- `0017` is described above, and for anything tokenized from source the rule
-  is exact. The residue is 13 `SUB` and `DECLARE` header lines in the corpus
-  that name a dotted procedure and carry no marker. Every one of the 13 is in
-  a file that was edited in the QB editor, and none of the freshly loaded
-  probe files shows the behaviour, so the likeliest reading is that the editor
-  regenerates those header lines without re-applying the marker. That is a
-  guess, not a result.
+What follows is everything still open, and for the opcodes it says what kind
+of thing each one is even where the name is not known.
 
-  Ruled out by experiment along the way, so nobody repeats them: trailing
-  whitespace, a compile artefact, word padding, a trailing colon, and the
-  procedure preamble kind byte.
+**Opcodes.** The statement range is 242 of 256 assigned, the function range
+127 of 128. What is left divides into three groups.
 
-- The `PUT` raster operations are 0 `OR`, 1 `AND`, 2 `PRESET`, 3 `PSET`,
-  4 `XOR`. `OPEN`'s trailing word is described below; only bit 16 of its low
-  byte and bit `0x08` of its high byte have not been seen.
+- Nine values below `000a` are structural rather than statements. `0000`,
+  `0001`, `0004` and `0005` are line headers the decoder has to read as such,
+  and `0002` sends QB into a loop when it is handed one, writing lines until
+  it is stopped. The rest of that range is almost certainly the same.
+- `0013` and `0014` behave exactly like `0002`, so they are not statements
+  either.
+- That leaves three genuine unknowns. `0034` and `0035` come back from PDS as
+  a bare colon, which is a real rendering rather than a fallback: PDS writes
+  an empty line for an opcode it has no text for, which is what `008b` to
+  `008e` do. What statement writes only a colon is not known. `0099` is
+  refused by both QuickBASIC 4.5 and BASIC 7 PDS, bare and with operands
+  supplied, so it is not simply a later keyword.
+
+The one unassigned function code, `0108`, is not a missing function. It fits
+the type-conversion family, whose members have `08` as their low byte and a
+high byte one more than a multiple of four; the high byte indexes the target
+type, 1 `CINT` through 4 `CDBL`. `0108` is index 0, meaning no type, and
+`1508` is index 5, `STRING`. Both are unused slots.
+
+Ten opcodes are identified but produce no display text at all: `0017`, the
+dotted name marker, `004b`, `0024`, `007b`, `007c`, `0098` and `008b` to
+`008e`. Whatever they record, QB writes nothing for them, so ignoring them
+costs nothing.
+
+Three more are silent in 4.5 but not meaningless, and PDS is what shows it.
+`017f` is `CHDRIVE` and `0030` is `SIGNAL`, both keywords 4.5 keeps a slot for
+and never prints. `017e` is a `lo TO hi` range: handed one with two values on
+the stack, PDS writes `1 TO 1`, and with none it writes the punctuation that
+would surround it. All three stay silent here, because reproducing what
+QuickBASIC 4.5 writes is the contract.
+
+None of the five opcodes still unidentified, and none of these three, appears
+anywhere in the corpus: 57 files and 12,708 lines, including programs written
+by other people. They are holes no real program reaches, which is why source
+alone could never have closed them.
+
+**Fields.**
+
 - The `DIM ... AS <type>` payload described above.
-- The trailing word on statements like `LOCATE` and `COLOR` is twice the
-  argument count, but on `LINE` it is the `B`/`BF` shape flag and on `PUT` the
-  raster action -- so it is statement-specific, not a general argument count.
 - Header bytes `0x12`, `0x14`, `0x15`, `0x18` and `0x19` vary across the
   corpus and are not understood. Everything else in `0x00`-`0x19` is constant,
   including the words `0x0181` at `0x06` and `0x0182` at `0x08`, which are
   fixed values rather than references to anything. `0x13` records editor
   provenance and `0x1a` is the code reference.
 - The four `head` words and `unknown_c` in the section trailer.
-- The hash QB computes for a name, as described under the symbol table. The
-  hash for numeric labels is known; this one is not.
-- Nine values below `000a` are structural rather than statements: `0000`,
-  `0001`, `0004` and `0005` are line headers the decoder has to read as such,
-  and `0002` makes QB loop when it is handed one, so the rest of that range is
-  almost certainly the same kind of thing.
-- Five statement opcodes are still unassigned: `13 14 34 35 99`.
-  - `0013` and `0014` are not statements. Handed one, QB writes lines until it
-    is stopped, the same as `0002`.
-  - `0034` and `0035` both come back from PDS as a bare colon. That is a real
-    rendering rather than a fallback: PDS writes an empty line for an opcode
-    it has no text for, which is what `008b` to `008e` produce. What statement
-    writes only a colon is not known.
-  - `0099` is refused by both QB 4.5 and PDS 7, so it is not simply a later
-    keyword. It presumably needs a context a probe of one opcode cannot give
-    it. `8b`-`8e` sit among the I/O markers rather than in either
-  alphabetical block, and `13`, `14`, `24`, `25`, `30` and `34`-`36` sit in the
-  low region that has no alphabetical order to read them by. Handing each to QB
-  one at a time, as described above, is the way to finish them.
-  Eleven opcodes are identified but produce no display text at all: `0017`,
-  the dotted name marker, `004b`, `0024`, `007b`, `007c`, `0098`, `008b` to
-  `008e`, and `017e` and `017f`. Whatever they record, both QB 4.5 and PDS write nothing for them, so
-  ignoring them costs nothing.
+- The hash QB computes for a name. The hash for numeric labels is known; this
+  one is not, and a broad search of the obvious rolling-hash families found
+  nothing. It does not matter for writing a file, since QB rebuilds its own
+  lookup on load.
+- `OPEN`'s trailing word is described above; only bit 16 of its low byte and
+  bit `0x08` of its high byte have not been seen.
+- The trailing word on statements like `LOCATE` and `COLOR` is twice the
+  argument count, but on `LINE` it is the `B`/`BF` shape flag and on `PUT` the
+  raster action, so it is statement-specific rather than a general count.
 
-  Of the unassigned function codes, `0108` is not a missing function at
-  all: it fits the type-conversion family, whose members have `08` as their
-  low byte and a high byte one more than a multiple of four. The high byte
-  indexes the target type, 1 `CINT` through 4 `CDBL`, and `0108` is index 0,
-  meaning no type. `1508` is index 5, `STRING`, and is unused for the same
-  reason. `017e` and `017f`, past the end of the alphabetical function block, are
-  transparent: handed one, QB prints whatever was already on the stack and
-  writes nothing of its own. `014c` was the third, and
-  it turned out to be `SHELL` used as a function rather than a statement:
-  both QB 4.5 and PDS write `PRINT SHELL(1)` for it. The quick reference
-  lists `SHELL` only as a statement, so the alphabetical position was the
-  clue.
+**Forms that cannot be told apart.** `LOCK #1, TO 32` and `LOCK #1, 1 TO 32`
+produce the same tokens, so the first comes back as the second. Nothing in the
+stored form distinguishes an omitted lower bound from an explicit 1.
+
+**The dotted name marker.** `0017` is described above, and for anything
+tokenized from source the rule is exact. The residue is 13 `SUB` and `DECLARE`
+header lines in the corpus that name a dotted procedure and carry no marker.
+Every one of the 13 is in a file that was edited in the QB editor, and none of
+the freshly loaded probe files shows the behaviour, so the likeliest reading is
+that the editor regenerates those header lines without re-applying the marker.
+That is a guess, not a result.
+
+Ruled out by experiment along the way, so nobody repeats them: trailing
+whitespace, a compile artefact, word padding, a trailing colon, and the
+procedure preamble kind byte.
 
 ### A name written in a case the table does not hold
 
@@ -609,51 +625,58 @@ for byte, including 12,708 lines of code written by other people, so whatever
 causes it needs the kind of collision that only arises from stitching
 unrelated programs together.
 
-### What would help most
+### How the gaps were closed, and what is left
 
-`TORUS` and `JOHNNY` closed most of the earliest gaps: between them they
-supplied `TYPE ... END TYPE`, `SELECT CASE`, `ON ERROR`/`RESUME`, `GOSUB`,
-`DEFINT`, `SWAP`, `PALETTE`, `PLAY` and double-precision arithmetic. The
-programs in `samples/` closed the rest of the keyword set, and then the
-argument-count and bare forms of the statements, which is where the real
-gaps turned out to be.
+`TORUS` and `JOHNNY` closed the earliest gaps: between them they supplied
+`TYPE ... END TYPE`, `SELECT CASE`, `ON ERROR`/`RESUME`, `GOSUB`, `DEFINT`,
+`SWAP`, `PALETTE`, `PLAY` and double-precision arithmetic. The programs in
+`samples/` closed the rest of the keyword set, and then the argument-count and
+bare forms of the statements, which is where the real gaps turned out to be.
 
-Three things would move it further, in order of what they would buy:
+Four things closed the remainder, and they are worth naming because each one
+found something the previous could not:
 
-- **A tokenizer.** Writing a file is a stronger test than reading one,
-  because it has to reproduce every field rather than just skip the ones it
-  does not understand. `tokenize(detokenize(f)) == f` would either confirm the
-  trailer words, the name hash and the `STOP` second word or point straight at
-  whichever one is wrong.
-- **The QuickHelp reference.** `QB45ADVR.HLP` holds the full 4.5 syntax
-  reference in Microsoft QuickHelp format (`LN` magic, Huffman plus keyword
-  compression). Decoding it would enumerate every documented form mechanically
-  instead of leaving the last 33 statement opcodes to be guessed at from what
-  sits next to them in the table.
-- **The rest of the reference examples.** Five of the nine batches of
-  programming examples pulled out of the help file round-trip exactly and are
-  in the corpus. The other four still differ on twenty lines between them.
-  Two of those are genuinely undecidable as things stand: `LOCK #2, TO 32`
-  and `LOCK #2, 1 TO 32` produce identical token streams, so the omitted
-  start cannot be recovered. The rest are a name recorded in one letter case
-  and written back in another, and a handful of lines where the extraction
-  pulled prose or DATA values in as code.
-- **More real-world programs.** Three large ones (a NES emulator and both
-  modules of an 8086 emulator, 5,342 lines between them) found eleven bugs in
-  an afternoon that fifty synthetic samples had not: tab indentation, the
-  suffix rules for long literals, the `DEF<type>` delta between sections, and
-  `EXIT DEF` among them. Programs written by other people exercise different
-  habits.
-- **Files from other versions.** Everything here is QuickBASIC 4.5. QB 4.0 and
-  the BASIC 7.x PDS releases wrote their own variants of this format, and some
-  of the unassigned opcodes are plausibly theirs, since the table would have
-  been shared across the product line. PDS 7 adds 54 keywords over 4.5: a
-  `CURRENCY` type with `CCUR`, `CVC`, `MKC$` and `DEFCUR`; the ISAM database
-  verbs `BEGINTRANS`, `COMMITTRANS`, `ROLLBACK`, `CHECKPOINT`, `SAVEPOINT`,
-  `CREATEINDEX`, `DELETEINDEX`, `DELETETABLE`, `SETINDEX`, `GETINDEX$`,
-  `MOVEFIRST`, `MOVELAST`, `MOVENEXT`, `MOVEPREVIOUS`, `SEEKEQ`, `SEEKGE`,
-  `SEEKGT`, `INSERT`, `DELETE`, `UPDATE`, `RETRIEVE` and `BOF`; the far-string
-  helpers `SSEG`, `SSEGADD`, `STRINGADDRESS`, `STRINGASSIGN`, `STRINGLENGTH`
-  and `STRINGRELEASE`; `CHDRIVE`, `CURDIR$` and `DIR$`; and the `FORMAT`
-  family. An opcode QB 4.5 will not render is a candidate for one of these,
-  and `QBX.EXE` can be driven the same way `QB.EXE` is to find out.
+- **A writer.** Writing the format is a stronger check than reading it,
+  because it has to reproduce every field rather than skip what it does not
+  understand. Rebuilding all 57 corpus files byte for byte exposed three
+  fields the reader had glossed over: the procedure preamble records `SUB` or
+  `FUNCTION` and the return type, the trailer kind is not always `0c02`, and
+  there is a fixed 259-byte gap between the name table and the first section.
+- **Real programs by other people.** A NES emulator and both modules of an
+  8086 emulator, 5,342 lines between them, found eleven faults in an afternoon
+  that fifty synthetic samples had not: tab indentation, the suffix rules for
+  long literals, the `DEF<type>` delta between sections, `EXIT DEF` and more.
+- **The reference examples.** `QB45ADVR.HLP` prints a worked program for 160
+  statements. Running those through QB gave Microsoft's own code to check
+  against, and revealed that both statement ranges are alphabetical, which
+  makes a hole in the table predictable from the names either side of it.
+- **Asking QB, and then PDS.** Once there is a writer, an opcode can be handed
+  to the product rather than hunted for in source. QB 4.5 named seven that
+  way. BASIC 7 PDS named two more that 4.5 keeps a slot for and refuses to
+  print, `SIGNAL` and `CHDRIVE`, and confirmed `SHELL` has a function form the
+  quick reference does not mention.
+
+What would help now, in order:
+
+- **QuickBASIC 4.0 files.** Everything here is 4.5. The claim that 4.0 wrote a
+  different variant is repeated from other projects' documentation, not
+  tested, which is the one place this document passes on something it has not
+  checked.
+- **PDS-written files.** PDS reads 4.5 files correctly, but what it writes has
+  not been looked at.
+- **Whatever produces `0034`, `0035` and `0099`.** Those three are the only
+  statement opcodes left whose nature is genuinely unknown.
+- **The last four example batches.** Five of the nine round-trip exactly and
+  are in the corpus. The other four differ on twenty lines: two are the `LOCK`
+  ambiguity described above, some are a name recorded in one letter case and
+  written back in another, and the rest are lines where the extraction pulled
+  prose or `DATA` values in as code.
+
+PDS 7 adds 54 keywords over 4.5, which is the list to check an unrenderable
+opcode against: a `CURRENCY` type with `CCUR`, `CVC`, `MKC$` and `DEFCUR`; the
+ISAM verbs `BEGINTRANS`, `COMMITTRANS`, `ROLLBACK`, `CHECKPOINT`, `SAVEPOINT`,
+`CREATEINDEX`, `DELETEINDEX`, `DELETETABLE`, `SETINDEX`, `GETINDEX$`,
+`MOVEFIRST`, `MOVELAST`, `MOVENEXT`, `MOVEPREVIOUS`, `SEEKEQ`, `SEEKGE`,
+`SEEKGT`, `INSERT`, `DELETE`, `UPDATE`, `RETRIEVE` and `BOF`; the far-string
+helpers `SSEG`, `SSEGADD`, `STRINGADDRESS`, `STRINGASSIGN`, `STRINGLENGTH` and
+`STRINGRELEASE`; `CHDRIVE`, `CURDIR$` and `DIR$`; and the `FORMAT` family.
