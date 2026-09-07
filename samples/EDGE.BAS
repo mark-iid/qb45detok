@@ -1,0 +1,28 @@
+DEFINT A-Z
+ON ERROR GOTO 900
+A$ = "hello"
+MID$(A$, 1, 2) = "HE"
+WRITE A$, 1, 2
+LOCATE , , 1
+LOCATE 5, , 0
+X = 1
+ON X GOTO 100, 200
+ON X GOSUB Lab1, Lab2
+RESTORE Data1
+READ Q
+GOSUB Lab1
+END
+
+100 PRINT "a"
+200 PRINT "b"
+
+Lab1:
+RETURN Lab2
+
+Lab2:
+RETURN
+
+Data1:
+DATA 1, 2, 3
+
+900 RESUME 100

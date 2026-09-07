@@ -105,18 +105,21 @@ class Renderer:
 
     #: The event selector opcodes render as KEY(n), STRIG(n), TIMER(n).
     EVENT_TEXT = {"STRIG_EVENT": "STRIG", "KEY_EVENT": "KEY",
-                  "TIMER_SELECT": "TIMER", "COM_EVENT": "COM"}
+                  "TIMER_SELECT": "TIMER", "COM_EVENT": "COM",
+                  "PLAY_EVENT_N": "PLAY"}
 
     #: Statements whose arguments are simply everything left on the stack.
     LIST_STATEMENTS = frozenset({
         "READ", "LINE", "LINE_NOCOLOR", "LINE_TO", "PSET", "PSET_NOCOLOR",
-        "PRESET", "PUT_GRAPHICS", "GET_GRAPHICS", "CIRCLE", "CIRCLE_COLOR",
+        "PRESET", "PRESET_NOCOLOR", "PUT_GRAPHICS", "GET_GRAPHICS",
+        "CIRCLE", "CIRCLE_COLOR",
         "PAINT", "WINDOW", "VIEW_PRINT", "SOUND", "PLAY", "BLOAD", "BSAVE",
         "SHELL", "KILL", "ERASE", "RANDOMIZE", "WIDTH", "DEF_SEG_TO",
+        "BLOAD_ONE",
         "KEY", "PALETTE", "SWAP",
         "RESTORE", "VIEW_PRINT", "ERASE", "DEF_SEG_TO", "FILES", "GET_FILE",
         "PUT_FILE", "GET_FILE_VAR", "PUT_FILE_VAR", "LOCK", "UNLOCK",
-        "SEEK_STMT", "BSAVE", "PALETTE_USING", "IOCTL",
+        "SEEK_STMT", "BSAVE", "PALETTE_USING", "IOCTL", "WAIT_XOR",
     })
 
     #: Statements that introduce a list of declarations written after them.
@@ -130,6 +133,7 @@ class Renderer:
         self.bf = bf
         self.section_kind: Optional[int] = None
         self.section_is_function = False
+        self.in_def_fn = False  # inside a multi-line DEF FN, where EXIT is "EXIT DEF"
 
     # -- names -----------------------------------------------------------
 
@@ -157,21 +161,25 @@ class Renderer:
         declared_col: Optional[int] = None
         pad_col: Optional[int] = None
         decl_heads: List[str] = []
+        common_block: Optional[str] = None  # the /name/ on a COMMON block
         # How many entries on the stack are finished declarations rather than
         # values, so an array's bounds cannot swallow the name before it.
         declared_so_far = 0
-        single_bound = False
+        dim_marks: set = set()  # stack depths whose value is a lone upper bound
         marks: List[bool] = []  # one per ARG: True when a value follows
         channel: Optional[str] = None  # the "#n" a file statement applies to
         field_channel: Optional[str] = None
         print_keyword = "PRINT"
         input_prompt: Optional[str] = None
+        input_flags = 0  # INPUT punctuation: 0x04 prompt, 0x02 ";", 0x01 ","
         default_sep = ": "
         trailing_colon = False
         # A DIM/REDIM keyword can come after its declarations, so look ahead:
         # array subscripts inside a declaration are bounds, written "lo TO hi".
         declaring_line = any(i.mnemonic in self.DECLARATION_HEADS
                              for i in line.instrs)
+        if any(i.mnemonic == "END_DEF" for i in line.instrs):
+            self.in_def_fn = False
         pending: Optional[str] = None  # a keyword prefixing the next statement
         comment_at: Optional[int] = None
 
@@ -218,6 +226,12 @@ class Renderer:
                 stack.append('"' + (ins.text or "") + '"')
             elif mn == "PUSH_HEX":
                 stack.append("&H%X" % ins.operands[0])
+            elif mn == "PUSH_HEX_LONG":
+                stack.append("&H%X" % (ins.operands[0] | (ins.operands[1] << 16)))
+            elif mn == "PUSH_OCT":
+                stack.append("&O%o" % ins.operands[0])
+            elif mn == "PUSH_OCT_LONG":
+                stack.append("&O%o" % (ins.operands[0] | (ins.operands[1] << 16)))
             elif mn == "PUSH_LONG":
                 stack.append(str(ins.operands[0] | (ins.operands[1] << 16)))
             elif mn == "PUSH_SINGLE":
@@ -227,8 +241,7 @@ class Renderer:
             elif op.form == "literal":
                 stack.append(op.text)
             elif op.form == "var" and mn.startswith(("DECL", "ARRDECL")):
-                text = self._declaration(ins, stack, declared_so_far, single_bound)
-                single_bound = False
+                text = self._declaration(ins, stack, declared_so_far, dim_marks)
                 if declared_type is not None:
                     # Each name carries its own AS clause: "DIM A AS X, B AS Y".
                     text += f" AS {declared_type}"
@@ -241,15 +254,9 @@ class Renderer:
                   and (declaring_line or declared_type is not None)):
                 # An array declared with empty parentheses has no bounds, and
                 # anything already on the stack belongs to an earlier name.
-                free = len(stack) - declared_so_far
-                if ins.operands[0] == 0:
-                    wanted = 0
-                elif single_bound:
-                    wanted = min(1, free)
-                else:
-                    wanted = min(free, 2)
-                single_bound = False
-                stack.append(self._value(ins, pop, bounds=wanted, declaring=True))
+                dims = self._bounds(stack, ins.operands[0], dim_marks,
+                                    declared_so_far)
+                stack.append(self._value(ins, pop, bounds=dims, declaring=True))
                 declared_so_far = len(stack)
             elif op.form == "var" and mn.startswith(("LOAD", "ARRAY")):
                 stack.append(self._value(ins, pop))
@@ -281,9 +288,10 @@ class Renderer:
             elif mn == "FIELD_ITEM":
                 width, target = pop(2)
                 stack.append(f"{width} AS {target}")
-            elif mn in ("PEN_EVENT", "UEVENT"):
+            elif mn in ("PEN_EVENT", "UEVENT", "PLAY_EVENT"):
                 stack.append(op.text)
-            elif mn in ("STRIG_EVENT", "KEY_EVENT", "TIMER_SELECT", "COM_EVENT"):
+            elif mn in ("STRIG_EVENT", "KEY_EVENT", "TIMER_SELECT", "COM_EVENT",
+                        "PLAY_EVENT_N"):
                 (which,) = pop()
                 stack.append(f"{self.EVENT_TEXT[mn]}({which})")
             elif mn in ("EVENT_ON", "EVENT_OFF", "EVENT_STOP"):
@@ -323,7 +331,9 @@ class Renderer:
                 if all(x.mnemonic == "DOTTED_NAME" for x in rest):
                     trailing_colon = True
             elif mn == "DIM_ARRAY":
-                single_bound = True
+                # Marks the dimension about to be pushed as having only an
+                # upper bound. The rest were written "lo TO hi".
+                dim_marks.add(len(stack))
             elif mn == "CONST":
                 pending = "CONST"
                 default_sep = ", "   # "CONST TRUE = -1, FALSE = 0"
@@ -331,10 +341,18 @@ class Renderer:
                 # "DIM SHARED" arrives as SHARED then DIM, so the keywords
                 # read back in reverse.
                 decl_heads.insert(0, self.DECLARATION_HEADS[mn])
+                # COMMON's second operand names its block, 0xffff when it has
+                # none. The name follows every keyword: "COMMON SHARED /B/ C".
+                if mn == "COMMON" and len(ins.operands) > 1 and ins.operands[1] != 0xFFFF:
+                    common_block = self.name(ins.operands[1])
             elif mn == "REM_META":
                 # The only form in the corpus; the text is not stored.
                 emit("REM $DYNAMIC" if ins.operands[:1] == [1] else "REM")
             elif mn == "DEF_FN":
+                # A one-line DEF FN assigns on the same line; only the block
+                # form opens a body where EXIT means EXIT DEF.
+                self.in_def_fn = not any(x.mnemonic.startswith("STORE")
+                                         for x in line.instrs)
                 emit("DEF " + self._def_fn(ins))
             elif mn == "DEF_FN_END_LINE":
                 (value,) = pop()
@@ -395,6 +413,36 @@ class Renderer:
                 target = ", ".join(argv[:-1])
                 emit(f"OPEN {target} FOR {mode}{self._open_clauses(word)} AS {chan}"
                      if mode else f"OPEN {target} AS {chan}")
+            elif mn in ("MID_ASSIGN2", "MID_ASSIGN3"):
+                # Stack is start, [length,] value, target.
+                if mn == "MID_ASSIGN3":
+                    start, length, value, target = pop(4)
+                    emit(f"MID$({target}, {start}, {length}) = {value}")
+                else:
+                    start, value, target = pop(3)
+                    emit(f"MID$({target}, {start}) = {value}")
+            elif mn in ("ON_GOTO", "ON_GOSUB"):
+                (index,) = pop()
+                pay = ins.payload or b""
+                refs = [int.from_bytes(pay[k:k + 2], "little")
+                        for k in range(0, len(pay) - len(pay) % 2, 2)]
+                word = "GOTO" if mn == "ON_GOTO" else "GOSUB"
+                emit(f"ON {index} {word} " + ", ".join(self.label(r) for r in refs))
+            elif mn == "RESTORE_LABEL":
+                emit(f"RESTORE {self.label(ins.operands[0])}")
+            elif mn == "RETURN_LABEL":
+                emit(f"RETURN {self.label(ins.operands[0])}")
+            elif mn == "STOP":
+                emit("STOP")
+            elif mn == "WIDTH_FILE":
+                argv = pop(len(stack))
+                emit("WIDTH " + ", ".join(argv))
+            elif mn in ("GET_FILE_NOREC", "PUT_FILE_NOREC"):
+                # "GET #1, , Rec" -- the record number was left out.
+                argv = pop(len(stack))
+                head = "GET" if mn == "GET_FILE_NOREC" else "PUT"
+                chan = argv[0] if argv else ""
+                emit(f"{head} {chan}, , " + ", ".join(argv[1:]))
             elif mn == "OPEN_MODE_STRING":
                 # The pre-4.0 form, "OPEN mode$, #n, file$[, reclen]", whose
                 # arguments are already in source order.
@@ -406,18 +454,33 @@ class Renderer:
                 (channel,) = pop()
             elif mn == "INPUT_VARS_END":
                 argv = pop(len(stack))
-                head = f"LINE INPUT {channel}, " if channel else "LINE INPUT "
-                emit(head + ", ".join(argv))
+                flags = ins.operands[0] if ins.operands else 0
+                if channel:
+                    emit(f"LINE INPUT {channel}, " + ", ".join(argv))
+                else:
+                    head = "LINE INPUT " + ("; " if flags & 0x02 else "")
+                    if flags & 0x04 and argv:
+                        sep = ", " if flags & 0x01 else "; "
+                        head += argv.pop(0) + sep
+                    emit(head + ", ".join(argv))
                 channel = None
             elif mn == "INPUT_PROMPT":
-                (input_prompt,) = pop()
+                input_flags = ins.payload[0] if ins.payload else 0
+                # With no prompt written there is nothing on the stack to take.
+                input_prompt = pop()[0] if input_flags & 0x04 else None
             elif mn == "INPUT_VARS":
                 pass
             elif mn == "INPUT":
                 argv = pop(len(stack))
-                head = f"INPUT {input_prompt}, " if input_prompt else "INPUT "
+                lead = "; " if input_flags & 0x02 else ""
+                if input_flags & 0x04:
+                    sep = ", " if input_flags & 0x01 else "; "
+                    head = f"INPUT {lead}{input_prompt}{sep}"
+                else:
+                    head = f"INPUT {lead}"
                 emit(head + ", ".join(argv))
                 input_prompt = None
+                input_flags = 0
 
             # -- PRINT ----------------------------------------------------
             elif mn == "PRINT_FUNC_SEMI":
@@ -496,7 +559,10 @@ class Renderer:
             elif mn == "END_SUB":
                 emit("END FUNCTION" if self.section_is_function else "END SUB")
             elif mn == "EXIT_SUB":
-                emit("EXIT FUNCTION" if self.section_is_function else "EXIT SUB")
+                if self.in_def_fn:
+                    emit("EXIT DEF")
+                else:
+                    emit("EXIT FUNCTION" if self.section_is_function else "EXIT SUB")
             elif mn in ("SUB", "FUNCTION", "DECLARE"):
                 text = self._signature(ins)
                 if mn != "DECLARE" and self.section_kind == self.STATIC_KIND:
@@ -509,11 +575,15 @@ class Renderer:
             elif mn == "NAME" and len(stack) == 2:
                 a, b = pop(2)
                 emit(f"NAME {a} AS {b}")
-            elif mn == "VIEW" and len(stack) >= 4:
+            elif mn in ("VIEW", "VIEW_SCREEN") and len(stack) >= 4:
                 argv = pop(len(stack))
                 head = f"({argv[0]}, {argv[1]})-({argv[2]}, {argv[3]})"
                 rest = argv[4:]
-                emit(("VIEW " + ", ".join([head] + rest)).rstrip())
+                emit((f"{op.text} " + ", ".join([head] + rest)).rstrip())
+            elif mn in ("VIEW_BARE", "WINDOW_BARE", "SHELL_BARE",
+                        "FILES_BARE", "RANDOMIZE_BARE", "SLEEP_BARE",
+                        "RUN_BARE"):
+                emit(op.text)
             elif mn in ("WINDOW", "WINDOW_SCREEN") and len(stack) == 4:
                 a, b, c, d = pop(4)
                 emit(f"{op.text} ({a}, {b})-({c}, {d})")
@@ -559,7 +629,10 @@ class Renderer:
                 names[-1] += f" AS {declared_type}"
                 if pad_col is None:
                     pad_col = declared_col
-            body = f"{' '.join(decl_heads)} {', '.join(names)}".strip()
+            heads = list(decl_heads)
+            if common_block:
+                heads.append(f"/{common_block}/")
+            body = f"{' '.join(heads)} {', '.join(names)}".strip()
             if len(names) == 1 and pad_col and " AS " in body:
                 # A lone declaration puts its AS clause at a recorded column,
                 # which is how QB lines up the members of a TYPE block.
@@ -628,7 +701,7 @@ class Renderer:
                 return prefix, mn[cut:]
         raise RenderError(f"not a variable opcode: {mn}")
 
-    def _value(self, ins: Instr, pop, bounds: Optional[int] = None,
+    def _value(self, ins: Instr, pop, bounds=None,
                declaring: bool = False) -> str:
         """A variable or array reference used as a value."""
         prefix, suffix = self._split(ins.mnemonic)
@@ -643,8 +716,27 @@ class Renderer:
             return self.name(ins.operands[0]) + suffix
         return self._subscripted(ins, suffix, pop)
 
+    def _bounds(self, stack: List[str], count: int, dim_marks: set,
+                floor: int) -> List[str]:
+        """Split the pushed bound values into one string per dimension.
+
+        The count operand is twice the number of dimensions however they were
+        written. A dimension marked by ``DIM_ARRAY`` has only an upper bound
+        and takes one value; the rest were written ``lo TO hi`` and take two.
+        """
+        dims: List[str] = []
+        for _ in range(count // 2):
+            if len(stack) <= floor:
+                break
+            if (len(stack) - 1) in dim_marks or len(stack) - 1 <= floor:
+                dims.insert(0, stack.pop())
+            else:
+                hi = stack.pop()
+                dims.insert(0, f"{stack.pop()} TO {hi}")
+        return dims
+
     def _declaration(self, ins: Instr, stack: List[str], declared_so_far: int,
-                     single_bound: bool = False) -> str:
+                     dim_marks: set) -> str:
         """A name being declared, with its bounds if it is an array.
 
         Inside a ``DIM``-style list the names already declared sit on the stack
@@ -655,22 +747,16 @@ class Renderer:
         if prefix == "DECL":
             return self.name(ins.operands[0]) + suffix
         base = self.name(ins.operands[1]) + suffix
-        free = len(stack) - declared_so_far
-        limit = 0 if ins.operands[0] == 0 else (1 if single_bound else 2)
-        bounds: List[str] = []
-        while stack and free > 0 and len(bounds) < limit:
-            bounds.insert(0, stack.pop())
-            free -= 1
-        return base + "(" + " TO ".join(bounds) + ")" if bounds else base + "()"
+        dims = self._bounds(stack, ins.operands[0], dim_marks, declared_so_far)
+        return base + "(" + ", ".join(dims) + ")" if dims else base + "()"
 
-    def _subscripted(self, ins: Instr, suffix: str, pop, bounds: Optional[int] = None,
+    def _subscripted(self, ins: Instr, suffix: str, pop, bounds=None,
                      declaring: bool = False) -> str:
         count, ref = ins.operands[0], ins.operands[1]
         if declaring:
-            # A declaration's subscripts are bounds: one upper bound, or
-            # "lo TO hi".
-            taken = pop(bounds or 0)
-            return self.name(ref) + suffix + "(" + " TO ".join(taken) + ")"
+            # A declaration's subscripts are bounds, already split per
+            # dimension by _bounds.
+            return self.name(ref) + suffix + "(" + ", ".join(bounds or ()) + ")"
         base = self.name(ref) + suffix
         if count == 0x8000:
             return base
@@ -826,6 +912,7 @@ class Renderer:
 
     def section(self, ds: DecodedSection) -> List[str]:
         self.section_kind = ds.section.kind_byte
+        self.in_def_fn = False
         self.section_is_function = any(
             i.mnemonic == "FUNCTION" for line in ds.lines for i in line.instrs
         )

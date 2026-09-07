@@ -46,6 +46,14 @@ Then put the two in `corpus/bin/NAME.BAS` and `corpus/txt/NAME.BAS`.
 | `RESERVED.BAS` | `SIGNAL` and `LOCAL`, which 4.5 reserves but does not parse |
 | `DOTS.BAS`, `NODOTS.BAS` | the same program with and without periods in its identifiers, which is what the `0017` marker tracks |
 | `DOTSUB.BAS` | the same question for `SUB` and `DECLARE` headers and for dotted parameter names |
+| `EDGE.BAS` | `MID$` as a statement, `ON n GOTO`/`GOSUB`, `RESTORE` and `RETURN` to a label, `WRITE` to the screen, `LOCATE` with omitted arguments |
+| `EDGE2.BAS` | the `PLAY` and `PEN` events, `STOP` on every event, `PLAY` as a function, `WIDTH #`, `INPUT`/`LINE INPUT` with a leading semicolon |
+| `EDGE3.BAS` | every punctuation form `INPUT` and `LINE INPUT` accept |
+| `EDGE4.BAS` | named `COMMON` blocks, octal literals, `LPRINT`, three-argument `WAIT`, `GET`/`PUT` with the record left out, `EXIT DEF` |
+| `EDGE5.BAS` | the argument-count variants of `INSTR`, `LBOUND`, `UBOUND`, `MID$`, `POINT`, `RND`, `SCREEN`, and long hex and octal literals |
+| `EDGE6.BAS` | every array declaration shape, including multi-dimensional bounds |
+| `EDGE7.BAS` | `PAINT`, `PSET`, `PRESET`, `VIEW`, `VIEW SCREEN`, `WINDOW` and `GET`/`PUT` graphics forms, and all six `CASE IS` comparisons |
+| `EDGE8.BAS` | the bare forms of `FILES`, `RANDOMIZE`, `SLEEP`, `RUN` and `SHELL`, one-argument `BLOAD`, and block and single-line `IF` |
 
 `TYPES.BAS` is deliberately kept as it is. Its `TYPE` member is called `Name`,
 which QB reads as the `NAME` statement, so the declaration is rejected, and
