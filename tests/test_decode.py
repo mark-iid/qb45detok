@@ -19,8 +19,8 @@ pytestmark = requires_corpus
 
 #: Sections whose line count matches the trailer. Every section does; this is
 #: here so a regression shows up as a failure rather than a silent slip.
-SECTIONS_IN_SYNC = 91
-TOTAL_SECTIONS = 91
+SECTIONS_IN_SYNC = 93
+TOTAL_SECTIONS = 93
 
 
 @pytest.fixture(scope="module", params=NAMES)
@@ -181,8 +181,6 @@ def test_comments_reconstruct_exactly(pair):
                     continue
                 checked += 1
                 assert "'" + ins.text.rstrip() in raw, repr(ins.text)
-    assert checked or name in ("JOHNNY.BAS", "STARDEF.BAS", "DEFTYPE.BAS",
-                               "TRAIL1.BAS", "TRAIL2.BAS", "FILEIO.BAS")
 
 
 

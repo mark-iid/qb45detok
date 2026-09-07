@@ -242,8 +242,10 @@ where the same opcode carries a payload that is not source text at all -- its
 leading word is 1 and its body contains NUL bytes. That form is not understood
 yet, so callers test for NUL before treating a payload as text.
 
-QB's text writer trims trailing whitespace, so a stored comment can be longer
-at the right than the line it produced.
+A comment's payload is padded to an even length with a space, and QB does not
+write that pad back out, so a stored comment can be one character longer at
+the right than the line it produced. Only four comments in the corpus hit it.
+Trailing whitespace is otherwise kept exactly.
 
 ### Jump targets are filled in by running the program
 
@@ -367,10 +369,6 @@ overall. The one exception is a single line in `DIRMAST` described below.
   `DIRMAST` has it and no mention of `ClrKbd` does -- but three procedures in
   `DRAWSCR1` have it on one mention and not another, so it is not simply a
   property of the name.
-- One line renders wrong: `IF Attr% AND 16 THEN GOTO Next.Dir:` in `DIRMAST`
-  loses its trailing colon. It is the only line in the corpus that both ends
-  in a colon and carries `0017`, and nothing else in its tokens separates it
-  from the same statement without one.
 - The `PUT` raster operations are 0 `OR`, 1 `AND`, 2 `PRESET`, 3 `PSET`,
   4 `XOR`. `OPEN` modes are 1 `INPUT`, 2 `OUTPUT`, 4 `RANDOM`, 8 `APPEND`,
   32 `BINARY`; 16 has not been seen.

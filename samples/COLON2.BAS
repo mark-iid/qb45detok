@@ -1,0 +1,6 @@
+DEFINT A-Z
+Attr = 16
+IF Attr AND 16 THEN GOTO Skip
+Skip:
+PRINT 1
+END

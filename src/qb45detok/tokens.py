@@ -67,6 +67,9 @@ def expand_runs(payload: bytes) -> bytes:
 #: carries a non-text payload on ``DIM ... AS <type>`` lines, which is why
 #: callers check for NUL bytes before treating a payload as source.
 TEXT_PAYLOAD_OPS = frozenset({0x000A, 0x0097, 0x00A6, 0x00E3})
+#: The comment opcode.
+REM = 0x0097
+
 #: Opcodes whose ``str`` payload is source text with no leading word.
 RAW_TEXT_OPS = frozenset()
 

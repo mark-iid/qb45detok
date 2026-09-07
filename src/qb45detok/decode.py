@@ -46,7 +46,14 @@ class Instr:
             return tokens.expand_runs(self.payload).decode("latin-1")
         if self.code in tokens.TEXT_PAYLOAD_OPS:
             body = self.payload[2:].rstrip(b"\x00")
-            return None if b"\x00" in body else tokens.expand_runs(body).decode("latin-1")
+            if b"\x00" in body:
+                return None
+            text = tokens.expand_runs(body).decode("latin-1")
+            if self.code == tokens.REM and text.endswith(" "):
+                # The payload is padded to an even length with a space, and
+                # QB does not write that pad back out.
+                text = text[:-1]
+            return text
         if self.op is not None and self.op.form == "literal" and self.payload:
             return tokens.expand_runs(self.payload).decode("latin-1")
         return None

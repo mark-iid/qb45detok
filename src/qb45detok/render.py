@@ -291,8 +291,10 @@ class Renderer:
             elif mn == "ARG_OMITTED":
                 marks.append(False)
             elif mn == "COLON":
-                # A colon at the very end of a line is written out.
-                if ins is line.instrs[-1]:
+                # A colon with nothing after it is written out. 0017 can sit
+                # past it and produces nothing, so look through it.
+                rest = line.instrs[line.instrs.index(ins) + 1:]
+                if all(x.mnemonic == "UNKNOWN_17" for x in rest):
                     trailing_colon = True
             elif mn == "DIM_ARRAY":
                 single_bound = True
@@ -549,10 +551,13 @@ class Renderer:
             if entry is not None and entry.line_number is None:
                 marker += ":"
             return f"{prefix}{marker}{(' ' + text) if text else ''}"
-        # A line with no statements still carries its indentation: QB keeps
-        # the spaces on a whitespace-only line, but trims trailing space from
-        # one that has content.
-        return prefix + text.rstrip() if text.strip() else prefix + text
+        # Trailing whitespace is kept: a comment can legitimately end in
+        # spaces, and a whitespace-only line carries its indentation. The one
+        # exception is the space CLS leaves for an argument it did not get,
+        # which QB does not write at the end of a line.
+        if text.endswith("CLS "):
+            text = text[:-1]
+        return prefix + text
 
     # -- helpers ---------------------------------------------------------
 
