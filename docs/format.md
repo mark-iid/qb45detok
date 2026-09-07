@@ -564,8 +564,15 @@ them like the neighbouring variant of the same statement.
   companion `0098`, `007b`, `007c`, and `0017`, which is the dotted name
   marker described earlier. Whatever the first four record, QB writes nothing
   for them, so ignoring them costs nothing.
-  The four unassigned function codes are `0108 014c 017e 017f`. They sit in the
-  alphabet between `ATN` and `CHR$`, between `SGN` and `SIN`, and after `DIM`.
+  Of the four unassigned function codes, `0108` is not a missing function at
+  all: it fits the type-conversion family, whose members have `08` as their
+  low byte and a high byte one more than a multiple of four. The high byte
+  indexes the target type, 1 `CINT` through 4 `CDBL`, and `0108` is index 0,
+  meaning no type. `1508` is index 5, `STRING`, and is unused for the same
+  reason. That leaves `014c`, `017e` and `017f`. `014c` sits between `SGN` and
+  `SIN`, where the only documented keywords are `SHELL` and `SIGNAL`, neither
+  of them a function; `017e` and `017f` are past the end of the alphabetical
+  function block, among the operators and markers.
 
 ### What would help most
 
@@ -605,4 +612,13 @@ Three things would move it further, in order of what they would buy:
 - **Files from other versions.** Everything here is QuickBASIC 4.5. QB 4.0 and
   the BASIC 7.x PDS releases wrote their own variants of this format, and some
   of the unassigned opcodes are plausibly theirs, since the table would have
-  been shared across the product line.
+  been shared across the product line. PDS 7 adds 54 keywords over 4.5: a
+  `CURRENCY` type with `CCUR`, `CVC`, `MKC$` and `DEFCUR`; the ISAM database
+  verbs `BEGINTRANS`, `COMMITTRANS`, `ROLLBACK`, `CHECKPOINT`, `SAVEPOINT`,
+  `CREATEINDEX`, `DELETEINDEX`, `DELETETABLE`, `SETINDEX`, `GETINDEX$`,
+  `MOVEFIRST`, `MOVELAST`, `MOVENEXT`, `MOVEPREVIOUS`, `SEEKEQ`, `SEEKGE`,
+  `SEEKGT`, `INSERT`, `DELETE`, `UPDATE`, `RETRIEVE` and `BOF`; the far-string
+  helpers `SSEG`, `SSEGADD`, `STRINGADDRESS`, `STRINGASSIGN`, `STRINGLENGTH`
+  and `STRINGRELEASE`; `CHDRIVE`, `CURDIR$` and `DIR$`; and the `FORMAT`
+  family. An opcode QB 4.5 will not render is a candidate for one of these,
+  and `QBX.EXE` can be driven the same way `QB.EXE` is to find out.

@@ -10,6 +10,10 @@ oracle for the language than guessing from an opcode table.
 Everything here was worked out from the two files themselves. Where something
 is a best guess rather than a result, it says so.
 
+The same reader handles the BASIC 7 PDS help files without changes:
+`BAS7QCK.HLP` gives 428 topics and `BAS7ADVR.HLP` another 269, which is where
+the list of what PDS adds over 4.5 in `format.md` comes from.
+
 ## Layout
 
     0x00  char[2]   "LN"
