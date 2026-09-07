@@ -469,7 +469,7 @@ their bare form. Functions do the same: `INSTR`, `LBOUND`, `UBOUND`, `MID$`,
 
 The opcode table is dense enough that the holes in it are a usable map of what
 has not been reached, and working through them is what found most of the
-above. The statement range is now 229 of 256 assigned and the function range
+above. The statement range is now 242 of 256 assigned and the function range
 124 of 128.
 
 Both ranges are alphabetical, which is what makes a hole predictable. The
@@ -563,17 +563,24 @@ the slot at the position alphabetical order demands, between `PLAY` and
   `0001`, `0004` and `0005` are line headers the decoder has to read as such,
   and `0002` makes QB loop when it is handed one, so the rest of that range is
   almost certainly the same kind of thing.
-- 10 statement opcodes are still unassigned: `13 14 34 35 36 8b 8c 8d 8e 99`.
-  `0013` and `0014` are not statements: handed one, QB writes lines until it
-  is stopped, the same as `0002`. `0099` is refused by both QB 4.5 and PDS 7,
-  so it is not simply a later keyword. `8b`-`8e` sit among the I/O markers rather than in either
+- Five statement opcodes are still unassigned: `13 14 34 35 99`.
+  - `0013` and `0014` are not statements. Handed one, QB writes lines until it
+    is stopped, the same as `0002`.
+  - `0034` and `0035` both come back from PDS as a bare colon. That is a real
+    rendering rather than a fallback: PDS writes an empty line for an opcode
+    it has no text for, which is what `008b` to `008e` produce. What statement
+    writes only a colon is not known.
+  - `0099` is refused by both QB 4.5 and PDS 7, so it is not simply a later
+    keyword. It presumably needs a context a probe of one opcode cannot give
+    it. `8b`-`8e` sit among the I/O markers rather than in either
   alphabetical block, and `13`, `14`, `24`, `25`, `30` and `34`-`36` sit in the
   low region that has no alphabetical order to read them by. Handing each to QB
   one at a time, as described above, is the way to finish them.
-- Five opcodes are identified but produce no display text: `004b`, `0075`'s
-  companion `0098`, `007b`, `007c`, and `0017`, which is the dotted name
-  marker described earlier. Whatever the first four record, QB writes nothing
-  for them, so ignoring them costs nothing.
+  Nine opcodes are identified but produce no display text at all: `0017`, the
+  dotted name marker, `004b`, `0024`, `007b`, `007c`, `0098`, and `008b` to
+  `008e`. Whatever they record, both QB 4.5 and PDS write nothing for them, so
+  ignoring them costs nothing.
+
   Of the four unassigned function codes, `0108` is not a missing function at
   all: it fits the type-conversion family, whose members have `08` as their
   low byte and a high byte one more than a multiple of four. The high byte

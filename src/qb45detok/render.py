@@ -430,7 +430,8 @@ class Renderer:
                 decl_heads = [""]
                 stack.append(self.name(ins.operands[0]))
             elif mn in ("DOTTED_NAME", "ELSE_MARK", "STOP_MARK",
-                        "MARK_7B", "MARK_7C", "MARK_24"):
+                        "MARK_7B", "MARK_7C", "MARK_24",
+                        "MARK_8B", "MARK_8C", "MARK_8D", "MARK_8E"):
                 pass
             elif mn == "LET":
                 pending = "LET"

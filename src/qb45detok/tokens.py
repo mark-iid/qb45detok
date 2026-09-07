@@ -332,6 +332,12 @@ _OPS = [
     # "SIGNAL(n)", which is how it was identified.
     _op(0x0030, "SIGNAL_EVENT", (), 1, "SIGNAL", "stmt"),
     _op(0x0031, "STRIG_EVENT", (), 1, "STRIG", "stmt"),
+    # Four markers among the file I/O opcodes. Neither QB 4.5 nor PDS 7
+    # writes anything for them.
+    _op(0x008B, "MARK_8B", (), 0, None, "stmt"),
+    _op(0x008C, "MARK_8C", (), 0, None, "stmt"),
+    _op(0x008D, "MARK_8D", (), 0, None, "stmt"),
+    _op(0x008E, "MARK_8E", (), 0, None, "stmt"),
     _op(0x008F, "SPC", (), 1, "SPC", "func"),
     _op(0x0090, "TAB", (), 1, "TAB", "func"),
     _op(0x0091, "PRINT_FUNC_COMMA", (), 0, None, "stmt"),
@@ -439,6 +445,9 @@ _OPS = [
     _op(0x00DB, "PSET", (), None, "PSET", "stmt"),
     _op(0x00E7, "SCREEN", ("u16",), None, "SCREEN", "stmt"),
     # -- calls --------------------------------------------------------
+    # The other argument modifier, paired with BYVAL at 0025. In a
+    # signature the same thing is a bit of the parameter mode word.
+    _op(0x0036, "SEG_ARG", (), 0, "SEG", "stmt"),
     _op(0x0037, "CALL", ("argc", "ref"), None, "CALL", "stmt"),
     # Counted payload holding one u16 label reference per branch target.
     _op(0x0068, "ON_GOSUB", ("str",), 1, "ON", "stmt"),
