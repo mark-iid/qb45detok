@@ -13,12 +13,11 @@ authors = [{ name = "Mark Earnest" }]
 keywords = [
     "quickbasic", "qbasic", "qb45", "basic", "detokenizer", "detokenize",
     "tokenized", "retrocomputing", "msdos", "dos", "file-format",
-    "reverse-engineering",
 ]
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
-    "Topic :: Software Development :: Disassemblers",
+    "Topic :: Software Development :: Pre-processors",
 ]
 
 [project.urls]
