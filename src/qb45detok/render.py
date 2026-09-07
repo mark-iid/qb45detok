@@ -135,7 +135,8 @@ class Renderer:
         "LINE", "LINE_NOCOLOR", "LINE_TO", "PSET", "PSET_NOCOLOR",
         "PRESET", "PRESET_NOCOLOR", "PUT_GRAPHICS", "GET_GRAPHICS",
         "CIRCLE", "CIRCLE_COLOR",
-        "PAINT", "WINDOW", "VIEW_PRINT", "SOUND", "PLAY", "BLOAD", "BSAVE",
+        "PAINT", "PAINT_ALT", "PUT_ALT", "WINDOW", "VIEW_PRINT", "SOUND",
+        "PLAY", "BLOAD", "BSAVE",
         "SHELL", "KILL", "ERASE", "RANDOMIZE", "WIDTH", "DEF_SEG_TO",
         "BLOAD_ONE",
         "KEY", "PALETTE", "SWAP",
@@ -428,7 +429,7 @@ class Renderer:
             elif mn == "TYPE_MEMBER":
                 decl_heads = [""]
                 stack.append(self.name(ins.operands[0]))
-            elif mn == "DOTTED_NAME":
+            elif mn in ("DOTTED_NAME", "ELSE_MARK", "STOP_MARK"):
                 pass
             elif mn == "LET":
                 pending = "LET"
@@ -602,6 +603,9 @@ class Renderer:
             elif mn == "IF_THEN_LINE":
                 (cond,) = pop()
                 emit(f"IF {cond} THEN", sep=" ")
+            elif mn == "IF_THEN_ALT":
+                (cond,) = pop()
+                emit(f"IF {cond} THEN", sep=" ")
             elif mn in ("IF_THEN_GOTO", "IF_GOTO"):
                 # "IF x THEN 100" and "IF x GOTO 100" name their target
                 # directly rather than opening a THEN clause.
@@ -657,6 +661,8 @@ class Renderer:
                 else:
                     emit("CLS " if marks else "CLS")
                 marks = []
+            elif mn in ("GOSUB_ALT", "GOTO_ALT"):
+                emit(f"{op.text} {self.label(ins.operands[0])}")
             elif mn in ("CALL", "CALLS", "CALL_IMPLICIT"):
                 count = ins.operands[0]
                 argv = pop(count) if count else []

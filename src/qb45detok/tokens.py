@@ -221,10 +221,14 @@ _OPS = [
     # After a line-number THEN the ELSE keyword is its own opcode, and an
     # ELSE that names a line writes the number with no GOTO.
     _op(0x004A, "ELSE_LINE", ("ref",), 0, None, "stmt"),
+    # Identified by handing QB a file built around the opcode and reading
+    # back what it wrote. It produces no text of its own.
+    _op(0x004B, "ELSE_MARK", (), 0, None, "stmt"),
     _op(0x004C, "ELSE_AFTER_LINE", (), 0, "ELSE", "stmt"),
     _op(0x004D, "ELSEIF", ("u16",), 1, "ELSEIF", "stmt"),
     _op(0x0051, "END_SUB", (), 0, "END SUB", "stmt"),
     _op(0x005E, "IF_THEN_GOTO", ("ref",), 1, "IF", "stmt"),
+    _op(0x005F, "IF_THEN_ALT", ("u16",), 1, "IF", "stmt"),
     _op(0x0060, "IF_GOTO", ("ref",), 1, "IF", "stmt"),
     _op(0x005D, "IF_THEN_LINE", ("u16",), 1, "IF", "stmt"),
     _op(0x0061, "IF_THEN_BLOCK", ("u16",), 1, "IF", "stmt"),
@@ -236,7 +240,9 @@ _OPS = [
     _op(0x0054, "EXIT_FOR", ("u16",), 0, "EXIT FOR", "stmt"),
     _op(0x0056, "FOR", ("u16", "u16"), None, "FOR", "stmt"),
     _op(0x0059, "GOSUB", ("ref",), 0, "GOSUB", "stmt"),
+    _op(0x005A, "GOSUB_ALT", ("ref",), 0, "GOSUB", "stmt"),
     _op(0x005B, "GOTO", ("ref",), 0, "GOTO", "stmt"),
+    _op(0x005C, "GOTO_ALT", ("ref",), 0, "GOTO", "stmt"),
     _op(0x0063, "LOOP_UNTIL", ("u16",), 1, "LOOP UNTIL", "stmt"),
     _op(0x0064, "LOOP_WHILE", ("u16",), 1, "LOOP WHILE", "stmt"),
     _op(0x0057, "FOR_STEP", ("u16", "u16"), None, "FOR", "stmt"),
@@ -317,6 +323,9 @@ _OPS = [
     _op(0x0090, "TAB", (), 1, "TAB", "func"),
     _op(0x0091, "PRINT_FUNC_COMMA", (), 0, None, "stmt"),
     _op(0x0092, "PRINT_FUNC_SEMI", (), 0, None, "stmt"),
+    # The second word of STOP, which is always stored as "0075 0098". It
+    # produces no text.
+    _op(0x0098, "STOP_MARK", (), 0, None, "stmt"),
     _op(0x009A, "BEEP", (), 0, "BEEP", "stmt"),
     _op(0x009B, "BLOAD_ONE", (), 1, "BLOAD", "stmt"),
     _op(0x009C, "BLOAD", (), None, "BLOAD", "stmt"),
@@ -399,6 +408,7 @@ _OPS = [
     _op(0x00CD, "OPTION_BASE_0", (), 0, "OPTION BASE 0", "stmt"),
     _op(0x00CE, "OPTION_BASE", (), 0, "OPTION BASE 1", "stmt"),
     _op(0x00D0, "PAINT", (), None, "PAINT", "stmt"),
+    _op(0x00D1, "PAINT_ALT", (), None, "PAINT", "stmt"),
     _op(0x00D2, "PALETTE_BARE", (), 0, "PALETTE", "stmt"),
     _op(0x00D3, "PALETTE", (), None, "PALETTE", "stmt"),
     _op(0x00D6, "PLAY", (), 1, "PLAY", "stmt"),
@@ -409,6 +419,7 @@ _OPS = [
     _op(0x00D5, "PCOPY", (), 2, "PCOPY", "stmt"),
     _op(0x00D7, "POKE", (), 2, "POKE", "stmt"),
     _op(0x00DA, "PSET_NOCOLOR", (), None, "PSET", "stmt"),
+    _op(0x00DC, "PUT_ALT", (), None, "PUT", "stmt"),
     _op(0x00DD, "PUT_FILE", (), None, "PUT", "stmt"),
     _op(0x00DE, "PUT_FILE_NOREC", ("u16",), None, "PUT", "stmt"),
     _op(0x00DF, "PUT_FILE_VAR", ("u16",), None, "PUT", "stmt"),

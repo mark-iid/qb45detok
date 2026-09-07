@@ -488,6 +488,40 @@ Four of the remaining statement holes cannot be opcodes at all: `0000`, `0001`,
 statement can use them. That leaves 33 genuinely unassigned, listed at the end
 of this section.
 
+### Asking QB directly
+
+Once there is a writer, an unidentified opcode does not have to be hunted for
+in real source. A file can be built around it and handed to QB, and whatever
+QB writes back out is the answer.
+
+The probe is a module whose token stream alternates a comment naming the
+opcode under test with the opcode itself:
+
+    ' =005A=
+    <opcode 005a>
+    ' =005C=
+    <opcode 005c>
+
+Loading that and saving as text gives:
+
+    '=005A=
+    GOSUB '=005C=
+    GOTO
+
+which says `005a` is a `GOSUB` and `005c` a `GOTO`, and that both consume a
+following word as an operand, since each swallowed the comment that came
+after it. That matches where the alphabetical order puts them.
+
+Two cautions. Put each opcode in its own file, or at least expect everything
+after a misbehaving one to be lost: an opcode that takes more operands than
+the probe supplies eats the next line. And some values are not statements at
+all -- `0002` sent QB into a loop that wrote a 311MB file before it was
+stopped -- so check the output size before reading it.
+
+This is what identified `004b`, `005a`, `005c`, `005f`, `0098`, `00d1` and
+`00dc`. The forms are not established, only the keywords, so the table renders
+them like the neighbouring variant of the same statement.
+
 ### Known unknowns
 
 - `0017` is described above, and for anything tokenized from source the rule
@@ -517,17 +551,18 @@ of this section.
 - The four `head` words and `unknown_c` in the section trailer.
 - The hash QB computes for a name, as described under the symbol table. The
   hash for numeric labels is known; this one is not.
-- 27 statement opcodes are still unassigned: `02 03 07 08 09 13 14 24 25 30 34
-  35 36 4b 5a 5c 5f 7b 7c 8b 8c 8d 8e 98 99 d1 dc`. The alphabetical layout
-  says roughly where most of them belong: `5a` is a `GOSUB` variant, `5c` a
-  `GOTO` one, `5f` an `IF` one, `4b` an `ELSE` one, `d1` a `PAINT` one and
-  `dc` a `PUT` one, each sitting next to a form of the same keyword that is
-  already identified. `0098` is the second word of `STOP`, which is always
-  stored as `0075 0098`; what the second word records is not known, but it is
-  the same in every sample. `8b`-`8e` sit among the I/O markers rather than in
-  either alphabetical block, and `02`-`09`, `13`, `14`, `24`, `25`, `30` and
-  `34`-`36` sit in the low region that has no alphabetical order at all.
-  The four unassigned function codes are `0108 014c 017e 017f`.
+- Nine values below `000a` are structural rather than statements: `0000`,
+  `0001`, `0004` and `0005` are line headers the decoder has to read as such,
+  and `0002` makes QB loop when it is handed one, so the rest of that range is
+  almost certainly the same kind of thing.
+- 15 statement opcodes are still unassigned: `13 14 24 25 30 34 35 36 7b 7c 8b
+  8c 8d 8e 99`. `7b` is known to produce no display text, the way `004b` and
+  `0098` do. `8b`-`8e` sit among the I/O markers rather than in either
+  alphabetical block, and `13`, `14`, `24`, `25`, `30` and `34`-`36` sit in the
+  low region that has no alphabetical order to read them by. Handing each to QB
+  one at a time, as described above, is the way to finish them.
+  The four unassigned function codes are `0108 014c 017e 017f`. They sit in the
+  alphabet between `ATN` and `CHR$`, between `SGN` and `SIN`, and after `DIM`.
 
 ### What would help most
 

@@ -136,7 +136,8 @@ and `detok` exits non-zero so you know to look.
   than silently wrong output.
 
 `docs/format.md` lists the open questions, including the hypotheses I ruled out
-by experiment so nobody repeats them.
+by experiment so nobody repeats them, and how to ask QuickBASIC itself what an
+opcode means rather than hunting for source that produces one.
 
 ## Testing
 
