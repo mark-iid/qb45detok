@@ -518,9 +518,17 @@ the probe supplies eats the next line. And some values are not statements at
 all -- `0002` sent QB into a loop that wrote a 311MB file before it was
 stopped -- so check the output size before reading it.
 
-This is what identified `004b`, `005a`, `005c`, `005f`, `0098`, `00d1` and
-`00dc`. The forms are not established, only the keywords, so the table renders
-them like the neighbouring variant of the same statement.
+This is what identified `004b`, `005a`, `005c`, `005f`, `0098`, `00d1`,
+`00dc`, `0024` and `0025`. The forms are not established, only the keywords,
+so the table renders them like the neighbouring variant of the same statement.
+
+The same probe works against `QBX.EXE`, the BASIC 7 PDS editor, which reads a
+QuickBASIC 4.5 file and writes the same text back. That is worth doing for any
+opcode 4.5 will not render, because the later product knows keywords 4.5 does
+not. `0030` is the case that proves it: 4.5 documents `SIGNAL` as a reserved
+word, refuses to parse `SIGNAL ON`, and will not render the opcode, yet keeps
+the slot at the position alphabetical order demands, between `PLAY` and
+`STRIG`. Handed the same file, PDS writes `SIGNAL()`.
 
 ### Known unknowns
 
@@ -555,8 +563,10 @@ them like the neighbouring variant of the same statement.
   `0001`, `0004` and `0005` are line headers the decoder has to read as such,
   and `0002` makes QB loop when it is handed one, so the rest of that range is
   almost certainly the same kind of thing.
-- 13 statement opcodes are still unassigned: `13 14 24 25 30 34 35 36 8b 8c 8d
-  8e 99`. `8b`-`8e` sit among the I/O markers rather than in either
+- 10 statement opcodes are still unassigned: `13 14 34 35 36 8b 8c 8d 8e 99`.
+  `0013` and `0014` are not statements: handed one, QB writes lines until it
+  is stopped, the same as `0002`. `0099` is refused by both QB 4.5 and PDS 7,
+  so it is not simply a later keyword. `8b`-`8e` sit among the I/O markers rather than in either
   alphabetical block, and `13`, `14`, `24`, `25`, `30` and `34`-`36` sit in the
   low region that has no alphabetical order to read them by. Handing each to QB
   one at a time, as described above, is the way to finish them.

@@ -128,7 +128,7 @@ class Renderer:
     #: The event selector opcodes render as KEY(n), STRIG(n), TIMER(n).
     EVENT_TEXT = {"STRIG_EVENT": "STRIG", "KEY_EVENT": "KEY",
                   "TIMER_SELECT": "TIMER", "COM_EVENT": "COM",
-                  "PLAY_EVENT_N": "PLAY"}
+                  "PLAY_EVENT_N": "PLAY", "SIGNAL_EVENT": "SIGNAL"}
 
     #: Statements whose arguments are simply everything left on the stack.
     LIST_STATEMENTS = frozenset({
@@ -329,7 +329,7 @@ class Renderer:
             elif mn in ("PEN_EVENT", "UEVENT", "PLAY_EVENT"):
                 stack.append(op.text)
             elif mn in ("STRIG_EVENT", "KEY_EVENT", "TIMER_SELECT", "COM_EVENT",
-                        "PLAY_EVENT_N"):
+                        "PLAY_EVENT_N", "SIGNAL_EVENT"):
                 (which,) = pop()
                 stack.append(f"{self.EVENT_TEXT[mn]}({which})")
             elif mn in ("EVENT_ON", "EVENT_OFF", "EVENT_STOP"):

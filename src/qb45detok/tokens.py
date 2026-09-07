@@ -327,6 +327,10 @@ _OPS = [
     _op(0x0089, "INPUT_PROMPT", ("str",), 1, None, "stmt"),
     _op(0x002A, "EVENT_OFF", (), 0, "OFF", "stmt"),
     _op(0x002C, "EVENT_STOP", (), 0, "STOP", "stmt"),
+    # QuickBASIC 4.5 reserves SIGNAL but will not parse it, and will not
+    # render this opcode either. BASIC 7 PDS implements it and writes
+    # "SIGNAL(n)", which is how it was identified.
+    _op(0x0030, "SIGNAL_EVENT", (), 1, "SIGNAL", "stmt"),
     _op(0x0031, "STRIG_EVENT", (), 1, "STRIG", "stmt"),
     _op(0x008F, "SPC", (), 1, "SPC", "func"),
     _op(0x0090, "TAB", (), 1, "TAB", "func"),
