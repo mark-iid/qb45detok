@@ -35,11 +35,15 @@ every reference in every corpus file resolves to an entry boundary.
 Bytes `0x00`–`0x11` are byte-identical in all nine files. `0xfc` at offset 0 is
 the format magic.
 
-- `0x12` — `0x10` in eight files, `0x11` in `PROJECT2.BAS`. Unknown.
-- `0x13` — save-format flag, `0x51` in all nine. Re-saving from QB 4.5 in
-  QuickBASIC format rather than Text changes this byte to `0x10` and nothing
-  else, which is the silent failure mode described in the README.
-- `0x14`–`0x17` — `ff ff 24 00` in all nine. Unknown.
+- `0x12` — `0x10` everywhere except `PROJECT2.BAS`, which has `0x11`. Unknown.
+- `0x13` — `0x51` or `0x10`, and it tracks how the program reached the
+  editor rather than what format it was saved in. Every file typed or edited
+  in QB and then saved holds `0x51`; every file loaded from ASCII text and
+  saved holds `0x10`. **Verified** by generating a file both ways: both are
+  ordinary tokenized programs and both decode identically, so this byte does
+  not mark a failed conversion. It is worth knowing precisely because it
+  looks like it should.
+- `0x14`–`0x17` — `ff ff 24 00` in every file. Unknown.
 - `0x18` — a `DATA` pointer of some kind. **Verified**: it is `ffff` in every
   program that has no `DATA` statement and non-`ffff` in exactly the two that
   do. Neither value resolves as a name-table reference, so what it points into
