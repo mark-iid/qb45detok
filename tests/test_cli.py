@@ -52,3 +52,14 @@ def test_bad_file_reports_cleanly(capsys, tmp_path):
 def test_missing_file_reports_cleanly(capsys):
     assert main(["dump", "/nonexistent/NOPE.BAS"]) == 1
     assert "qb45detok:" in capsys.readouterr().err
+
+
+def test_tok_makes_a_file_detok_reads_back(tmp_path, capsys):
+    """The two commands are inverses, which is the point of having both."""
+    source = tmp_path / "in.BAS"
+    source.write_text('PRINT "hi"\r\nEND\r\n', encoding="latin-1")
+    binary = tmp_path / "out.BAS"
+    assert main(["tok", str(source), "-o", str(binary)]) == 0
+    assert binary.read_bytes()[0] == 0xFC
+    assert main(["detok", str(binary)]) == 0
+    assert capsys.readouterr().out == 'PRINT "hi"\nEND\n\n'

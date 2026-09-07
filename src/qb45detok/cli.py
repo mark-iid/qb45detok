@@ -10,6 +10,7 @@ from typing import List, Optional
 from .decode import decode_file, decode_section
 from .render import Renderer
 from .quickhelp import HelpFile, QuickHelpError
+from .tokenize import tokenize
 from .triage import scan
 from .reader import BinFile, ParseError, REF_BASE, Section
 
@@ -222,6 +223,17 @@ def cmd_hlp_dump(args) -> int:
 
 # -- triage -------------------------------------------------------------
 
+def cmd_tok(args) -> int:
+    """Read ASCII BASIC and write the binary QuickBASIC would have saved."""
+    text = Path(args.file).read_text(encoding="latin-1")
+    data = tokenize(text)
+    if args.output:
+        Path(args.output).write_bytes(data)
+    else:
+        sys.stdout.buffer.write(data)
+    return 0
+
+
 def cmd_triage(args) -> int:
     """Say what each file in a pile of old BASIC actually is."""
     findings = scan([Path(p) for p in args.paths], args.pattern)
@@ -280,6 +292,11 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("file")
     t.add_argument("-o", "--output", help="write CRLF text to this file instead of stdout")
     t.set_defaults(func=cmd_detok)
+
+    tk = sub.add_parser("tok", help="convert ASCII .BAS to the binary format")
+    tk.add_argument("file")
+    tk.add_argument("-o", "--output", help="write to this file instead of stdout")
+    tk.set_defaults(func=cmd_tok)
 
     tr = sub.add_parser("triage", help="identify a directory of old BASIC files")
     tr.add_argument("paths", nargs="+", help="files or directories to look at")

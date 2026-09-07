@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence, Tuple
 
+from . import tokens
 from .lex import Kind, Token
 
 #: Binary operators, tightest binding first. QB's own order: exponent, then
@@ -70,6 +71,8 @@ class Cursor:
     """A position in a token list, with the small helpers a parser wants."""
 
     tokens: List[Token]
+    #: The source line, for the few statements that copy their text verbatim.
+    text: str = ""
     i: int = 0
 
     @property
@@ -77,8 +80,11 @@ class Cursor:
         return self.tokens[self.i]
 
     def at(self, *texts: str) -> bool:
+        # A string literal is never a keyword, however it happens to read:
+        # CASE "+" is a string and not an operator.
         t = self.tok
-        return t.kind is not Kind.END and t.text.upper() in {x.upper() for x in texts}
+        return (t.kind not in (Kind.END, Kind.STRING)
+                and t.text.upper() in {x.upper() for x in texts})
 
     def at_end(self) -> bool:
         return self.tok.kind is Kind.END
@@ -137,6 +143,23 @@ def _parse_power(cur: Cursor) -> List[Emit]:
     return out
 
 
+def _builtin(cur: Cursor, spelled: str) -> List[Emit]:
+    """A built-in function: its arguments, then its own opcode."""
+    out: List[Emit] = []
+    count = 0
+    cur.take()
+    if not cur.at(")"):
+        while True:
+            out += parse_expression(cur)
+            count += 1
+            if not cur.at(","):
+                break
+            cur.take()
+    cur.expect(")")
+    mnemonic = BY_ARITY.get((spelled, count), BUILTINS[spelled])
+    return out + [Emit(mnemonic)]
+
+
 def _parse_primary(cur: Cursor) -> List[Emit]:
     t = cur.tok
     if t.kind is Kind.NUMBER:
@@ -151,14 +174,58 @@ def _parse_primary(cur: Cursor) -> List[Emit]:
         cur.expect(")")
         # QB stores the parentheses the programmer wrote, redundant or not.
         return inner + [Emit("PAREN")]
+    if cur.at("#"):
+        cur.take()
+        return parse_expression(cur) + [Emit("FILE_NUMBER")]
     if t.kind is Kind.NAME:
         return _parse_name(cur)
     raise ParseError(f"cannot start an expression with {t.text!r}")
 
 
+#: The built-in functions, by the name they are written under. QB has its
+#: own opcode for each, so LEFT$(A$, 2) is not a call at all.
+BUILTINS = {op.text.upper(): op.mnemonic for op in tokens.OPS.values()
+            if op.form == "func" and op.text and op.arity != 0}
+
+#: Built-ins spelled by how many arguments were written, since QB gives
+#: MID$(a, n) and MID$(a, n, m) opcodes of their own.
+CONVERSIONS = {name: name for name in tokens.CONVERT_NAMES.values()}
+
+BY_ARITY = {}
+for _op in tokens.OPS.values():
+    if _op.form == "func" and _op.text and _op.arity:
+        BY_ARITY[(_op.text.upper(), _op.arity)] = _op.mnemonic
+
+#: Those written without a list, which QB gives their own opcode: RND and
+#: RND(n) are not the same instruction.
+BARE_BUILTINS = {op.text.upper(): op.mnemonic for op in tokens.OPS.values()
+                 if op.form == "func" and op.text and op.arity == 0}
+BUILTINS.update({k: v for k, v in BARE_BUILTINS.items() if k not in BUILTINS})
+
 def _parse_name(cur: Cursor) -> List[Emit]:
     """A variable, an array or function call, or a record field access."""
     t = cur.take()
+    spelled = (t.text + t.suffix).upper()
+    if cur.at("(") and spelled in ("UBOUND", "LBOUND"):
+        cur.take()
+        name = cur.take()
+        out = [Emit("ARRAY", (name.text, name.suffix, 0x8000))]
+        mnemonic = spelled
+        if cur.at(","):
+            cur.take()
+            out += parse_expression(cur)
+            mnemonic += "_DIM"
+        cur.expect(")")
+        return out + [Emit(mnemonic)]
+    if cur.at("(") and spelled in CONVERSIONS:
+        cur.take()
+        out = parse_expression(cur)
+        cur.expect(")")
+        return out + [Emit(spelled)]
+    if cur.at("(") and spelled in BUILTINS:
+        return _builtin(cur, spelled)
+    if not cur.at("(") and spelled in BARE_BUILTINS:
+        return [Emit(BARE_BUILTINS[spelled])]
     out: List[Emit] = []
     args: List[List[Emit]] = []
     if cur.at("("):

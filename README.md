@@ -72,13 +72,25 @@ symbol table, the opcode encodings, and the parts I still cannot explain. If
 you want to write your own reader, or port this to another language, start
 there.
 
-## Reading source back in
+## Writing the format
 
-`qb45detok.lex`, `.expr` and `.parse` are the front half of a tokenizer: they
-turn BASIC source into the same reverse-Polish stream the decoder reads out of
-a binary. They get through 98.4% of the corpus. What is not written yet is the
-step that resolves names and picks the exact opcode per statement, so this is
-groundwork rather than a finished converter.
+It also goes the other way. `qb45detok tok` reads a text `.BAS` and writes the
+binary QuickBASIC saves, so a program edited in a modern editor can be handed
+back to QB 4.5 without opening the DOS editor.
+
+```
+qb45detok tok PROGRAM.TXT -o PROGRAM.BAS
+```
+
+That is the strongest test of the format there is. Reading a file lets you skip
+the fields you have not worked out; writing one does not. Every corpus program
+detokenizes, tokenizes and detokenizes again to the same text, bar the eight
+cases `docs/format.md` sets out, and the opcodes chosen match the ones
+QuickBASIC stored on every one of the 10,876 lines it tokenized.
+
+Bucket placement in the symbol table is the one thing not reproduced exactly:
+the hash QB uses for names is still unknown, so the writer puts everything in
+one chain. QB rebuilds its own lookup on load and reads such a file normally.
 
 ## Reading old data files
 
@@ -106,6 +118,7 @@ Python 3.9 or newer. No dependencies.
 ```
 qb45detok detok PROGRAM.BAS              # write source to stdout
 qb45detok detok PROGRAM.BAS -o OUT.BAS   # write a CRLF text file
+qb45detok tok PROGRAM.TXT -o OUT.BAS     # and back again
 ```
 
 If you have a directory of old files and do not know what is in it, start
@@ -208,7 +221,7 @@ pytest
 ```
 
 Without a corpus the format-level tests still run and the rest skip, which is
-what happens in CI: 115 of them run there against 1,334 here, since most of
+what happens in CI: 157 of them run there against 1,434 here, since most of
 the suite is one test per corpus file.
 
 ## License

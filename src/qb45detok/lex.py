@@ -71,10 +71,13 @@ def _numtype(text: str) -> str:
         return "long"
     if lowered.endswith("%"):
         return "integer"
-    if "d" in lowered and not lowered.startswith("&"):
-        return "double"
-    if "." in text or "e" in lowered:
-        return "single"
+    if not lowered.startswith("&"):
+        if "d" in lowered:
+            return "double"
+        if "." in text or "e" in lowered:
+            # An E in a hex literal is a digit, which is why this is asked
+            # only of a decimal one.
+            return "single"
     if lowered.startswith("&"):
         # Hex and octal are integers unless they overflow one.
         digits = text.lstrip("&hHoO").rstrip("&")
@@ -104,6 +107,26 @@ def lex(line: str) -> List[Token]:
             out.append(Token(Kind.STRING, line[i + 3:], column=i + 3))
             out.append(Token(Kind.END, "", column=n))
             return out
+        # DATA is copied out verbatim, so its items are never read as
+        # tokens: "$25.00" is a perfectly good DATA item.
+        if (not out or out[-1].text == ":") and line[i:i + 4].upper() == "DATA" \
+                and (i + 4 >= n or not line[i + 4].isalnum()):
+            # A colon outside quotes ends DATA; what follows is another
+            # statement and is lexed as usual.
+            end, quoted = n, False
+            for j in range(i + 4, n):
+                if line[j] == '"':
+                    quoted = not quoted
+                elif line[j] == ":" and not quoted:
+                    end = j
+                    break
+            out.append(Token(Kind.NAME, "DATA", column=i))
+            out.append(Token(Kind.STRING, line[i + 4:end], column=i + 4))
+            if end == n:
+                out.append(Token(Kind.END, "", column=n))
+                return out
+            i = end
+            continue
         # A period straight after a name or a closing bracket is a record
         # field rather than the start of something new.
         if c == "." and out and (out[-1].kind is Kind.NAME or out[-1].text == ")"):

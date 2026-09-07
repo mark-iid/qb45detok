@@ -110,6 +110,8 @@ class ImageWriter:
         #: known (0x12, 0x14, 0x15, 0x18, 0x19) and the editor-provenance byte
         #: at 0x13; the writer fills in the code reference at 0x1a.
         self.header = bytearray(HEADER_TEMPLATE)
+        #: Where the next entry will sit, as a reference.
+        self._next_ref = NAMES_OFF - REF_BASE
         #: The free space between the name table and the first section. Zero
         #: fill matches 48 of the 49 corpus files.
         self.slack = bytes(NAME_SLACK)
@@ -129,6 +131,8 @@ class ImageWriter:
         if found is None:
             found = OutName(flags=flags, text=text, number=number,
                             bucket=0 if bucket is None else bucket)
+            found.ref = self._next_ref
+            self._next_ref += 4 + len(found.payload)
             self._by_key[key] = found
             self.names.append(found)
         return found

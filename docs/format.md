@@ -532,7 +532,53 @@ word, refuses to parse `SIGNAL ON`, and will not render the opcode, yet keeps
 the slot at the position alphabetical order demands, between `PLAY` and
 `STRIG`. Handed the same file, PDS writes `SIGNAL()`.
 
-### Known unknowns
+## Writing a file
+
+`tokenize.py` goes the other way: source text in, a QuickBASIC 4.5 binary out.
+It is the part of this work that checks the rest, because a reader may skip a
+field it has not worked out and a writer may not.
+
+The split is the same as the format's. `lex.py` and `parse.py` turn one line
+into the sequence of instructions QB would have stored, `assemble.py` picks
+the opcode for each and interns every name, and `tokenize.py` puts the lines
+into sections, gives each its header word, and hands the result to
+`writer.py`.
+
+Three things need the whole program rather than one line:
+
+- **Record variables.** A period is an ordinary name character, so nothing in
+  `Disk.Sectors` says whether it is one name or a field of `Disk`. Only the
+  declarations say, so they are read first.
+- **Sections.** Each `SUB` and `FUNCTION` is stored separately, and a comment
+  block written directly above one goes with it: section membership is the
+  only thing a comment has, and that is where QB puts it.
+- **Default types.** A procedure records the `DEF<type>` state it inherited,
+  in a line that carries nothing else and is not written back out as text. A
+  `DEF<type>` line between two sections in a text file is that record rather
+  than a statement.
+
+### What the round trip reproduces
+
+Every corpus program goes to text and back to the same text, and the opcodes
+chosen match the ones QuickBASIC stored on all 10,876 lines it tokenized.
+Eight files differ, none of them about tokenizing:
+
+- Two comment lines that end in spaces. The payload is padded to an even
+  length with a space and the reader cannot tell a pad from a written one, so
+  a comment can lose one space on the way through.
+- Five files of manual text. Their prose pages are stored as untokenized
+  lines because QB refused them; this parser is more forgiving and tokenizes
+  some of them, which changes what comes back.
+- One line the renderer writes as `EXIT DEF` from an `EXIT SUB` opcode, and
+  one file that keeps 52 procedures in its module section rather than in
+  sections of their own.
+
+Bucket placement is the one field not reproduced. The hash QB uses for names
+is not known, so every name goes in one chain. QB rebuilds its own lookup when
+it loads a program and reads such a file exactly as it reads a normal one,
+which is how the placement came to be testable in the first place.
+
+## Known unknowns
 
 What follows is everything still open, and for the opcodes it says what kind
 of thing each one is even where the name is not known.
@@ -636,13 +682,17 @@ bare forms of the statements, which is where the real gaps turned out to be.
 Four things closed the remainder, and they are worth naming because each one
 found something the previous could not:
 
-- **A writer, and the front half of a tokenizer.** Writing the format is a
-  stronger check than reading it,
-  because it has to reproduce every field rather than skip what it does not
-  understand. Rebuilding all 57 corpus files byte for byte exposed three
-  fields the reader had glossed over: the procedure preamble records `SUB` or
-  `FUNCTION` and the return type, the trailer kind is not always `0c02`, and
-  there is a fixed 259-byte gap between the name table and the first section.
+- **A writer, and then a tokenizer.** Writing the format is a stronger check
+  than reading it, because it has to reproduce every field rather than skip
+  what it does not understand. Rebuilding all 57 corpus files byte for byte
+  exposed three fields the reader had glossed over: the procedure preamble
+  records `SUB` or `FUNCTION` and the return type, the trailer kind is not
+  always `0c02`, and there is a fixed 259-byte gap between the name table and
+  the first section. Going the whole way from source found a good deal more:
+  which statements mark their arguments and which do not, that a jump target
+  is left empty until the program runs, that `LINE`, `CIRCLE`, `PSET`, `GET`
+  and `PUT` each have an opcode per written form rather than a flag, and that
+  a procedure carries the default types it inherited.
 - **Real programs by other people.** A NES emulator and both modules of an
   8086 emulator, 5,342 lines between them, found eleven faults in an afternoon
   that fifty synthetic samples had not: tab indentation, the suffix rules for
@@ -659,13 +709,6 @@ found something the previous could not:
 
 What would help now, in order:
 
-- **The back half of the tokenizer.** `lex.py`, `expr.py` and `parse.py` turn
-  source into the same reverse-Polish stream the decoder reads back, and get
-  through 98.4% of the corpus, the failures being mostly the prose that sits
-  in untokenized lines. What is missing is the step that resolves names to
-  references and picks the exact opcode for each statement form, which is
-  where `writer.py` takes over. Finishing it gives
-  `tokenize(detokenize(f)) == f`, the strongest test available.
 - **QuickBASIC 4.0 files.** Everything here is 4.5. The claim that 4.0 wrote a
   different variant is repeated from other projects' documentation, not
   tested, which is the one place this document passes on something it has not
