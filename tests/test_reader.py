@@ -47,7 +47,7 @@ def procedures_in_text(text):
 
 
 def test_corpus_is_present():
-    assert len(NAMES) == 42, "expected forty-two matched pairs in corpus/"
+    assert len(NAMES) == 47, "expected forty-seven matched pairs in corpus/"
 
 
 def test_parses(pair):

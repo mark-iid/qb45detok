@@ -32,7 +32,7 @@ every reference in every corpus file resolves to an entry boundary.
     fc 00 01 00 0c 00 81 01 82 01 06 00 01 02 03 04 05 08  ..  ..  ff ff 24 00
      0                                                     12  13
 
-Bytes `0x00`-`0x11` are byte-identical in all 42 files. `0xfc` at offset 0 is
+Bytes `0x00`-`0x11` are byte-identical in all 47 files. `0xfc` at offset 0 is
 the format magic.
 
 - `0x12`: `0x10` everywhere except `PROJECT2.BAS`, which has `0x11`. Unknown.
@@ -53,11 +53,11 @@ the format magic.
 
 41 `u16` hash buckets at `0x1c`, each holding the reference of the first name
 entry in its chain, or 0 for an empty bucket. Verified: following every
-bucket chain reaches every name-table entry exactly once, in all 42 files.
+bucket chain reaches every name-table entry exactly once, in all 47 files.
 
 - `0x6e`: reference one past the last name entry, i.e. the end of the name
   table. Verified: walking entries from `0x72` lands exactly here.
-- `0x70`: `0x0052` in all 42 files, which is the reference of `0x6e` itself.
+- `0x70`: `0x0052` in all 47 files, which is the reference of `0x6e` itself.
   Probably a fixed "end of buckets" marker.
 
 ## Name table (from `0x72`)
@@ -93,7 +93,7 @@ can produce a 6,855-byte file.
 ## Code sections
 
 The module-level text comes first, at `code_ref + 0x1c`, and is preceded by a
-`u16` byte length. Verified: that length is exact in all 42 files.
+`u16` byte length. Verified: that length is exact in all 47 files.
 
 Every section is followed by a 16-byte trailer:
 
@@ -142,14 +142,14 @@ known -- it does not track whether the procedure takes parameters, whether it
 is a `FUNCTION` rather than a `SUB`, or whether its header carries `0017`.
 
 Verified: these names match the `SUB`/`FUNCTION` names in the text exactly,
-for all 42 files, and the sections tile the file from the code reference to
+for all 47 files, and the sections tile the file from the code reference to
 EOF with no gaps.
 
 ## Procedure sections in detail
 
 A procedure section starts at the run of comment lines immediately above its
 `SUB`/`FUNCTION` in the source, not at the keyword. Verified: with that
-rule, `line_count` matches the text for every procedure in all 42 files --
+rule, `line_count` matches the text for every procedure in all 47 files --
 including `PROJECT2`'s `MarkTest` and `BondCalc`, which look four lines short
 otherwise.
 
@@ -411,13 +411,13 @@ leaves it on a line that is only whitespace.
 ### Coverage
 
 `src/qb45detok/tokens.py` holds the opcodes identified so far. Against the
-whole corpus that accounts for every one of the 14,757 opcodes, with all 115
+whole corpus that accounts for every one of the 15,038 opcodes, with all 120
 sections decoding to exactly the line count their trailer records and decoded
 indentation matching QB's text output on every procedure line that can be
 checked. `qb45detok stats FILE` reports this per file.
 
-Rendering those tokens back to source reproduces all 42 corpus files byte for
-byte, the largest of them 1,091 lines, and all 5,008 lines overall.
+Rendering those tokens back to source reproduces all 47 corpus files byte for
+byte, the largest of them 1,091 lines, and all 5,090 lines overall.
 
 Cross-checked against the 224 keywords in the QB 4.5 help index, every
 documented statement and function is either an identified opcode or handled by
@@ -435,10 +435,17 @@ their bare form. Functions do the same: `INSTR`, `LBOUND`, `UBOUND`, `MID$`,
 `POINT`, `RND` and `SCREEN` all have one opcode per argument count.
 
 The opcode table is dense enough that the holes in it are a usable map of what
-has not been reached. The statement range is 211 of 256 assigned and the
-function range 121 of 128, and since functions run alphabetically an unassigned
-code sits next to the name it belongs to. Every function-range hole examined
-that way turned out to be an argument-count variant of its neighbour.
+has not been reached, and working through them is what found most of the
+above. The statement range is now 219 of 256 assigned and the function range
+121 of 128. Functions run alphabetically, so an unassigned code sits next to
+the name it belongs to; every function-range hole examined that way turned out
+to be an argument-count variant of its neighbour. Statement holes are less
+orderly but still cluster next to the keyword they vary.
+
+Four of the remaining statement holes cannot be opcodes at all: `0000`, `0001`,
+`0004` and `0005` are values the decoder has to read as a line header, so no
+statement can use them. That leaves 33 genuinely unassigned, listed at the end
+of this section.
 
 ### Known unknowns
 
@@ -463,6 +470,13 @@ that way turned out to be an argument-count variant of its neighbour.
   raster action -- so it is statement-specific, not a general argument count.
 - Header offsets `0x12` and `0x14`-`0x19`, and `unknown_a`/`unknown_c` in the
   section trailer.
+- 33 statement opcodes are still unassigned: `02 03 07 08 09 13 14 21 22 24 25
+  30 34 35 36 4b 5a 5c 5f 7b 7c 8b 8c 8d 8e 98 99 a7 b0 cb d1 dc ef`. Some of
+  these are certainly variants of their neighbours, in the way that `00b2` is
+  `GET #` with the record number left out. `0098` is the second word of `STOP`,
+  which is always stored as `0075 0098`; what the second word records is not
+  known, but it is the same in every sample.
+  The seven unassigned function codes are `0108 0122 014c 0152 0176 017e 017f`.
 
 ### What would help most
 

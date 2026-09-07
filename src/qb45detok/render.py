@@ -483,9 +483,16 @@ class Renderer:
                 input_flags = 0
 
             # -- PRINT ----------------------------------------------------
-            elif mn == "PRINT_FUNC_SEMI":
-                (value,) = pop()
-                printing.append(value + ";")
+            elif mn in ("PRINT_FUNC_SEMI", "PRINT_FUNC_COMMA"):
+                # A print item that carries its own separator. TAB and SPC
+                # always take a ";", so a following comma is written after
+                # it: "PRINT TAB(5); , X".
+                if stack:
+                    printing.append(pop()[0] + ";")
+                if mn == "PRINT_FUNC_COMMA":
+                    printing.append(",")
+                elif not printing:
+                    printing.append(";")
             elif mn in ("PRINT_SEMI", "PRINT_COMMA"):
                 (value,) = pop()
                 printing.append(value + (";" if mn == "PRINT_SEMI" else ","))
@@ -507,6 +514,21 @@ class Renderer:
             elif mn == "IF_THEN_LINE":
                 (cond,) = pop()
                 emit(f"IF {cond} THEN", sep=" ")
+            elif mn in ("IF_THEN_GOTO", "IF_GOTO"):
+                # "IF x THEN 100" and "IF x GOTO 100" name their target
+                # directly rather than opening a THEN clause.
+                (cond,) = pop()
+                word = "THEN" if mn == "IF_THEN_GOTO" else "GOTO"
+                emit(f"IF {cond} {word} {self.label(ins.operands[0])}", sep=" ")
+            elif mn == "ELSE_LINE":
+                # The else branch is a bare line number, no GOTO written.
+                if parts:
+                    seps[-1] = " "
+                emit(self.label(ins.operands[0]), sep=" ")
+            elif mn == "ELSE_AFTER_LINE":
+                if parts:
+                    seps[-1] = " "
+                emit("ELSE", sep=" ")
             elif mn == "ELSE" and parts:
                 seps[-1] = " "
                 emit("ELSE", sep=" ")
@@ -582,11 +604,20 @@ class Renderer:
                 emit((f"{op.text} " + ", ".join([head] + rest)).rstrip())
             elif mn in ("VIEW_BARE", "WINDOW_BARE", "SHELL_BARE",
                         "FILES_BARE", "RANDOMIZE_BARE", "SLEEP_BARE",
-                        "RUN_BARE"):
+                        "RUN_BARE", "PALETTE_BARE"):
                 emit(op.text)
             elif mn in ("WINDOW", "WINDOW_SCREEN") and len(stack) == 4:
                 a, b, c, d = pop(4)
                 emit(f"{op.text} ({a}, {b})-({c}, {d})")
+            elif mn in ("LINE_STYLE", "LINE_STYLE_NOCOLOR"):
+                # "LINE (a,b)-(c,d), colour, shape, style", where the colour
+                # and the shape can each be left as an empty slot.
+                argv = self._merge_coords(pop(len(stack)))
+                style = argv.pop()
+                coords = argv.pop(0) if argv else ""
+                colour = argv.pop(0) if mn == "LINE_STYLE" and argv else ""
+                shape = self.LINE_SHAPES.get(ins.operands[0], "") if ins.operands else ""
+                emit(f"LINE {coords}, {colour}, {shape}, {style}")
             elif mn in self.LIST_STATEMENTS:
                 argv = pop(len(stack)) if stack else []
                 argv = self._merge_coords(argv)

@@ -54,6 +54,11 @@ Then put the two in `corpus/bin/NAME.BAS` and `corpus/txt/NAME.BAS`.
 | `EDGE6.BAS` | every array declaration shape, including multi-dimensional bounds |
 | `EDGE7.BAS` | `PAINT`, `PSET`, `PRESET`, `VIEW`, `VIEW SCREEN`, `WINDOW` and `GET`/`PUT` graphics forms, and all six `CASE IS` comparisons |
 | `EDGE8.BAS` | the bare forms of `FILES`, `RANDOMIZE`, `SLEEP`, `RUN` and `SHELL`, one-argument `BLOAD`, and block and single-line `IF` |
+| `E9A.BAS` | `IF ... THEN <line>` and `IF ... GOTO <line>`, and the `ELSE` forms that go with them |
+| `E9B.BAS` | every `LINE` form, including the style mask and `LINE -(x, y)` |
+| `E9C.BAS` | `PALETTE` bare, and `TAB`/`SPC` in a `PRINT` list |
+| `E10.BAS` | the `THEN`/`ELSE` combinations that mix a line number with a statement |
+| `E11.BAS` | `PRINT` and `WRITE` punctuation to a file, and `STEP` on every graphics statement |
 
 `TYPES.BAS` is deliberately kept as it is. Its `TYPE` member is called `Name`,
 which QB reads as the `NAME` statement, so the declaration is rejected, and
