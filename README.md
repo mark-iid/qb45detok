@@ -1,5 +1,9 @@
 # qb45detok
 
+[![tests](https://github.com/mark-iid/qb45detok/actions/workflows/tests.yml/badge.svg)](https://github.com/mark-iid/qb45detok/actions/workflows/tests.yml)
+[![python](https://img.shields.io/badge/python-3.9%20to%203.13-blue)](https://github.com/mark-iid/qb45detok)
+[![license](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+
 **Convert Microsoft QuickBASIC 4.5 binary `.BAS` files back to readable BASIC
 source text.** No DOS, no DOSBox, no copy of `QB.EXE` needed.
 
@@ -203,7 +207,9 @@ mine. `samples/README.md` has the steps.
 pytest
 ```
 
-Without a corpus the format-level tests still run and the rest skip.
+Without a corpus the format-level tests still run and the rest skip, which is
+what happens in CI: 115 of them run there against 1,334 here, since most of
+the suite is one test per corpus file.
 
 ## License
 
