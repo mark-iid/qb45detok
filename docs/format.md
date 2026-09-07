@@ -581,15 +581,31 @@ the slot at the position alphabetical order demands, between `PLAY` and
   `008e`. Whatever they record, both QB 4.5 and PDS write nothing for them, so
   ignoring them costs nothing.
 
-  Of the four unassigned function codes, `0108` is not a missing function at
+  Of the unassigned function codes, `0108` is not a missing function at
   all: it fits the type-conversion family, whose members have `08` as their
   low byte and a high byte one more than a multiple of four. The high byte
   indexes the target type, 1 `CINT` through 4 `CDBL`, and `0108` is index 0,
   meaning no type. `1508` is index 5, `STRING`, and is unused for the same
-  reason. That leaves `014c`, `017e` and `017f`. `014c` sits between `SGN` and
-  `SIN`, where the only documented keywords are `SHELL` and `SIGNAL`, neither
-  of them a function; `017e` and `017f` are past the end of the alphabetical
-  function block, among the operators and markers.
+  reason. That leaves `017e` and `017f`, past the end of the alphabetical
+  function block, among the operators and markers. `014c` was the third, and
+  it turned out to be `SHELL` used as a function rather than a statement:
+  both QB 4.5 and PDS write `PRINT SHELL(1)` for it. The quick reference
+  lists `SHELL` only as a statement, so the alphabetical position was the
+  clue.
+
+### A name written in a case the table does not hold
+
+Normally a name is written back exactly as the name table spells it. One
+counterexample turned up while running the reference examples in concatenated
+batches: the table holds `Decimal`, carrying the statement-position flag, and
+QB writes the identifier as `decimal`. There is only one entry, confirmed by
+walking the chains and by walking the table linearly and getting the same 237
+either way, so this is not two entries with different spellings.
+
+It has never been seen in a real program. All 57 corpus files round-trip byte
+for byte, including 12,708 lines of code written by other people, so whatever
+causes it needs the kind of collision that only arises from stitching
+unrelated programs together.
 
 ### What would help most
 

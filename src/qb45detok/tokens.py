@@ -471,6 +471,8 @@ _OPS = [
     _op(0x0145, "RTRIM$", (), 1, "RTRIM$", "func"),
     _op(0x0149, "SEEK", (), 1, "SEEK", "func"),
     _op(0x014B, "SGN", (), 1, "SGN", "func"),
+    # SHELL has a function form as well as the statement at 00e9/00ea.
+    _op(0x014C, "SHELL_FUNC", (), 1, "SHELL", "func"),
     _op(0x014D, "SIN", (), 1, "SIN", "func"),
     _op(0x014F, "SQR", (), 1, "SQR", "func"),
     _op(0x014E, "SPACE$", (), 1, "SPACE$", "func"),
