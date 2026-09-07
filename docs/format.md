@@ -54,6 +54,30 @@ the format magic.
 41 `u16` hash buckets at `0x1c`, each holding the reference of the first name
 entry in its chain, or 0 for an empty bucket. Verified: following every
 bucket chain reaches every name-table entry exactly once, in all 49 files.
+Only buckets 0 to 39 are ever used; slot 40 is empty in every file.
+
+The two kinds of name are hashed into separate halves of the table. Numeric
+line labels land in buckets 32 to 39 and everything else in 0 to 31.
+
+The numeric hash is known:
+
+    bucket = 32 + (((n ^ (n >> 8)) >> 1) & 7)
+
+which is exact for all 30 distinct line numbers in the corpus. The high-byte
+fold only shows up above 511, which is why a simpler `(n >> 1) & 7` fits every
+label under that and then fails on 900, 911 and 999.
+
+The hash for names is not known. It is deterministic -- 1,758 distinct names
+across the corpus, none ever in two buckets -- and single letters map `A` to 1
+through `Z` to 26, which looks like `c & 0x1f`. But a search over the obvious
+rolling-hash families (XOR and add, byte and 5-bit and 7-bit, rotate left and
+right, forward and reversed, with and without a length seed and a final shift)
+found nothing above 85%.
+
+It also does not matter if you are writing a file. QB rebuilds its own lookup
+when it loads a program and does not check what it was given: a corpus file
+rewritten so that all four of its names sit in one chain in bucket 0, with the
+other 40 buckets empty, loads and re-saves with the source text unchanged.
 
 - `0x6e`: reference one past the last name entry, i.e. the end of the name
   table. Verified: walking entries from `0x72` lands exactly here.
@@ -468,8 +492,14 @@ of this section.
 - The trailing word on statements like `LOCATE` and `COLOR` is twice the
   argument count, but on `LINE` it is the `B`/`BF` shape flag and on `PUT` the
   raster action -- so it is statement-specific, not a general argument count.
-- Header offsets `0x12` and `0x14`-`0x19`, and `unknown_a`/`unknown_c` in the
-  section trailer.
+- Header bytes `0x12`, `0x14`, `0x15`, `0x18` and `0x19` vary across the
+  corpus and are not understood. Everything else in `0x00`-`0x19` is constant,
+  including the words `0x0181` at `0x06` and `0x0182` at `0x08`, which are
+  fixed values rather than references to anything. `0x13` records editor
+  provenance and `0x1a` is the code reference.
+- The four `head` words and `unknown_c` in the section trailer.
+- The hash QB computes for a name, as described under the symbol table. The
+  hash for numeric labels is known; this one is not.
 - 33 statement opcodes are still unassigned: `02 03 07 08 09 13 14 21 22 24 25
   30 34 35 36 4b 5a 5c 5f 7b 7c 8b 8c 8d 8e 98 99 a7 b0 cb d1 dc ef`. Some of
   these are certainly variants of their neighbours, in the way that `00b2` is
@@ -480,16 +510,26 @@ of this section.
 
 ### What would help most
 
-`TORUS` and `JOHNNY` closed most of the earlier gaps: between them they
+`TORUS` and `JOHNNY` closed most of the earliest gaps: between them they
 supplied `TYPE ... END TYPE`, `SELECT CASE`, `ON ERROR`/`RESUME`, `GOSUB`,
-`DEFINT`, `SWAP`, `PALETTE`, `PLAY` and double-precision arithmetic.
+`DEFINT`, `SWAP`, `PALETTE`, `PLAY` and double-precision arithmetic. The
+programs in `samples/` closed the rest of the keyword set, and then the
+argument-count and bare forms of the statements, which is where the real
+gaps turned out to be.
 
-The programs in `samples/` closed the rest: file I/O, `DEF FN`,
-`CONST`, `COMMON`, `STATIC`, all five `DEF<type>` ranges, `EXIT FOR`/`EXIT DO`,
-double-precision literals and the numeric function set.
+Three things would move it further, in order of what they would buy:
 
-Everything in `samples/` has been through QB and is in the corpus. That is
-where random access, record locking, the graphics forms, the directory, port
-and error-handling statements, `CHAIN`, `RUN`, `IOCTL`, the record conversion
-functions and the tracing statements came from. Nothing in the language is
-known to be unreached, though that is not the same as saying nothing is.
+- **A tokenizer.** Writing a file is a stronger test than reading one,
+  because it has to reproduce every field rather than just skip the ones it
+  does not understand. `tokenize(detokenize(f)) == f` would either confirm the
+  trailer words, the name hash and the `STOP` second word or point straight at
+  whichever one is wrong.
+- **The QuickHelp reference.** `QB45ADVR.HLP` holds the full 4.5 syntax
+  reference in Microsoft QuickHelp format (`LN` magic, Huffman plus keyword
+  compression). Decoding it would enumerate every documented form mechanically
+  instead of leaving the last 33 statement opcodes to be guessed at from what
+  sits next to them in the table.
+- **Files from other versions.** Everything here is QuickBASIC 4.5. QB 4.0 and
+  the BASIC 7.x PDS releases wrote their own variants of this format, and some
+  of the unassigned opcodes are plausibly theirs, since the table would have
+  been shared across the product line.
