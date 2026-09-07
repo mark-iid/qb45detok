@@ -59,6 +59,8 @@ Then put the two in `corpus/bin/NAME.BAS` and `corpus/txt/NAME.BAS`.
 | `E9C.BAS` | `PALETTE` bare, and `TAB`/`SPC` in a `PRINT` list |
 | `E10.BAS` | the `THEN`/`ELSE` combinations that mix a line number with a statement |
 | `E11.BAS` | `PRINT` and `WRITE` punctuation to a file, and `STEP` on every graphics statement |
+| `E12.BAS` | nested `TYPE`s, `LSET` between records, string `CONST`, `OPEN` with no `FOR` clause |
+| `E13.BAS` | `DIM SHARED`, `STATIC` and `SHARED` inside a `SUB`, `ERASE`, `TAB`/`SPC` written to a file |
 
 `TYPES.BAS` is deliberately kept as it is. Its `TYPE` member is called `Name`,
 which QB reads as the `NAME` statement, so the declaration is rejected, and

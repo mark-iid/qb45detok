@@ -30,7 +30,7 @@ head -c 1 OLDPROG.BAS | od -An -tx1
 | `f9`, `f1`, `f3` | older Microsoft BASIC | [decode_ms_basic.py] |
 | printable text | already ASCII | nothing to do |
 
-Only the `fc` row is something I have verified myself, across forty-seven files.
+Only the `fc` row is something I have verified myself, across forty-nine files.
 The rest is from those projects' own documentation, and is here so you do not
 waste time on the wrong tool, as I did.
 
@@ -95,12 +95,12 @@ qb45detok stats PROGRAM.BAS        # how much of the token stream is identified
 
 ## How well it works
 
-Across the forty-seven programs I have tested it on (my own code, a QuickBASIC
+Across the forty-nine programs I have tested it on (my own code, a QuickBASIC
 sample, and small programs written to exercise one feature each) **every one
 comes back byte for byte identical** to what QuickBASIC itself writes with
 Save As Text. The largest is 1,091 lines.
 
-Every opcode in those programs is identified, and all 120 code sections decode
+Every opcode in those programs is identified, and all 123 code sections decode
 to exactly the line count the file records for them.
 
 I also checked the opcode table against the 224 keywords in the QuickBASIC 4.5
