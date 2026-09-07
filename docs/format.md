@@ -1,0 +1,371 @@
+# The QuickBASIC 4.5 binary `.BAS` format
+
+Everything here was derived by comparing `corpus/bin/*` against `corpus/txt/*`,
+which QB 4.5 itself produced. Nothing comes from documentation. Statements
+marked **verified** are checked by `tests/test_reader.py` against all nine
+pairs; the rest are observations that still need confirming.
+
+## Overall layout
+
+| Offset | Size | Contents |
+|---|---|---|
+| `0x00` | 28 | header |
+| `0x1c` | 82 | symbol table: 41 hash buckets + 2 trailing words |
+| `0x72` | var | name table |
+| var | var | code sections: module text, then one per procedure |
+
+## Symbol references
+
+The single most important fact about the format: identifiers do not appear
+inline in the token stream. Everything refers to the name table by a **symbol
+reference**, and a reference is a byte offset measured from `0x1c` — the start
+of the hash-bucket array — not from the start of the file.
+
+    file_offset = ref + 0x1c
+
+The same reference space is used by the header, the bucket slots, the chain
+links inside name entries, and the operands in the token stream. **Verified**:
+every reference in every corpus file resolves to an entry boundary.
+
+## Header (`0x00`–`0x1b`)
+
+    fc 00 01 00 0c 00 81 01 82 01 06 00 01 02 03 04 05 08  ..  ..  ff ff 24 00
+     0                                                     12  13
+
+Bytes `0x00`–`0x11` are byte-identical in all nine files. `0xfc` at offset 0 is
+the format magic.
+
+- `0x12` — `0x10` in eight files, `0x11` in `PROJECT2.BAS`. Unknown.
+- `0x13` — save-format flag, `0x51` in all nine. Re-saving from QB 4.5 in
+  QuickBASIC format rather than Text changes this byte to `0x10` and nothing
+  else, which is the silent failure mode described in the README.
+- `0x14`–`0x17` — `ff ff 24 00` in all nine. Unknown.
+- `0x18` — `ffff` in seven files; `0x20f0` in `DIRMAST`, `0x07c6` in `STARDEF`.
+  Those are the two files with line numbers and with `DATA` statements. Likely
+  a reference to a line-number or `DATA` table. Unknown.
+- `0x1a` — **code reference**: ref of the first code section. **Verified**.
+
+## Symbol table (`0x1c`–`0x71`)
+
+41 `u16` hash buckets at `0x1c`, each holding the reference of the first name
+entry in its chain, or 0 for an empty bucket. **Verified**: following every
+bucket chain reaches every name-table entry exactly once, in all nine files.
+
+- `0x6e` — reference one past the last name entry, i.e. the end of the name
+  table. **Verified**: walking entries from `0x72` lands exactly here.
+- `0x70` — `0x0052` in all nine files, which is the reference of `0x6e` itself.
+  Probably a fixed "end of buckets" marker.
+
+## Name table (from `0x72`)
+
+Entries are packed with no padding and no alignment:
+
+    u16  link    reference of the next entry in this hash bucket, 0 to end
+    u8   flags
+    u8   length
+    ...  payload, `length` bytes
+
+For `flags` `0x00` and `0x40` the payload is the identifier as ASCII.
+
+| flags | Meaning |
+|---|---|
+| `0x00` | plain name (variable, label, external) |
+| `0x40` | procedure |
+| `0x02`, `0x04`, `0x06` | not a name — a 2-byte binary payload, unknown. Only in `DIRMAST`, `DRAWSCR1`, `PROJECT2`, `STARDEF`, the files with line numbers, `TYPE` and `DATA` |
+
+`0x40` is *about* procedures but is not simply "has a `DECLARE`": in `DIRMAST`
+13 declared procedures lack it and in `STARDEF` three flagged names have no
+`DECLARE`. The exact rule is not yet known.
+
+The table also holds names that appear nowhere in the source — `OBJSCAN` has
+`dir`, `Rotinue`, `Rotine` and `NMALLOC` for a 28-line program. QB evidently
+does not garbage-collect names once entered, which is why a 284-byte program
+can produce a 6,855-byte file.
+
+## Code sections
+
+The module-level text comes first, at `code_ref + 0x1c`, and is preceded by a
+`u16` byte length. **Verified**: that length is exact in all nine files.
+
+Every section is followed by a 16-byte trailer:
+
+    u16 u16 u16 u16   unknown
+    u32  line_count   source lines in the section
+    u16  unknown
+    u16  kind         0x0102 for the module text, 0x0c02 for a procedure
+
+Those first four words are often all `0xff`, which made them look like a
+signature worth scanning for. They are not: in `TORUS` most trailers read
+`ff ff 04 00 ff ff ff ff`, and scanning finds only one of its seventeen
+sections. Sections are found by **chaining declared lengths** instead -- every
+section states how long its token stream is, so the walk is stream, trailer,
+next section, to end of file. **Verified**: this reproduces the previously
+scanned boundaries exactly and finds all of `TORUS`.
+
+**Verified**: `line_count` equals the number of source lines in the
+corresponding text, counting `SUB`/`FUNCTION` and `END SUB`/`END FUNCTION`
+themselves, for every procedure in every file. This makes a useful oracle for
+the detokenizer: it says exactly how many lines a section must produce.
+
+Two adjustments are needed to make that come out exactly, and both are facts
+about the format rather than fudges. A procedure's section begins at the run
+of comment lines above its `SUB`, not at the keyword. And when the module
+carries a `DEFINT`-style statement, QB copies the type defaults to the head of
+every procedure as a hidden record; it occupies a counted line but is never
+printed, so those procedures read one line longer in the binary.
+
+**Verified**: `kind` cleanly separates module text from procedures.
+
+Each procedure section follows its predecessor's trailer immediately and starts
+with its own name:
+
+    u8   0x00
+    u8   length
+    u8   0x00
+    ...  name, `length` bytes
+    ...  tokens
+
+**Verified**: these names match the `SUB`/`FUNCTION` names in the text exactly,
+for all nine files, and the sections tile the file from the code reference to
+EOF with no gaps.
+
+## Procedure sections in detail
+
+A procedure section starts at the run of comment lines immediately above its
+`SUB`/`FUNCTION` in the source, not at the keyword. **Verified**: with that
+rule, `line_count` matches the text for every procedure in all nine files --
+including `PROJECT2`'s `MarkTest` and `BondCalc`, which look four lines short
+otherwise.
+
+## The token stream
+
+Each section's stream is a sequence of 16-bit little-endian words. Getting the
+alignment right matters: procedure names are variable-length, so the five-byte
+preamble described above has to be skipped exactly or every opcode shifts.
+
+### Lines
+
+The stream is a list of source lines. Each begins with a **header word**:
+
+    bits 15..10   indentation, in spaces
+    bits  9.. 0   flags
+
+Two flag bits are used:
+
+- `0x004` -- the line carries a label. Two more words follow: an offset, and
+  the name-table reference of the label. That reference resolves to a `flags`
+  `0x04` entry for `Retry:` style labels and a `flags` `0x06` entry for
+  numeric ones.
+- `0x001` -- the indentation is in the following word rather than in the
+  header's own field. That word holds a raw space count when the indent is 32
+  or more, and is otherwise a header-shaped word (`indent << 10`). Why small
+  indents sometimes take the escape is not understood, but both forms decode
+  unambiguously: low ten bits set means a raw count.
+
+A header is recognisable because no opcode has zero in its low ten bits apart
+from those flags.
+
+**Verified**: decoded indentation matches the leading spaces of QB's text
+output on all 2,551 procedure lines that can be checked, with no exceptions.
+That includes lines indented past 32, which only `TORUS` and `PROJECT2`
+contain and which is what exposed the escape in the first place.
+
+### Statements
+
+Statements are stored in reverse Polish -- operands first, then the operator.
+`Desc$ = SPACE$(80)` is
+
+    PUSH_INT 80 | SPACE$ | STORE$ Desc
+
+and `File$ = LCASE$(RTRIM$(LTRIM$(COMMAND$)))` is
+
+    COMMAND$ | LTRIM$ | RTRIM$ | LCASE$ | STORE$ File
+
+### Opcode encoding
+
+Three families are encoded rather than enumerated:
+
+- **Variable access.** The high byte is the data type and the low byte the
+  operation. Types: `00` SINGLE, `04` INTEGER, `08` LONG, `0c` DOUBLE, `14`
+  STRING. Operations: `0b` load, `0c` store, `0d` declare, `0e` array load,
+  `0f` array store, `10` array declare. So `140b` is "load a string variable"
+  and takes a symbol reference.
+- **Immediate constants.** Low byte `64`, with the value in the high byte as
+  `(high - 1) / 4`: `0164` pushes 0, `0564` pushes 1, `2964` pushes 10.
+- **Type conversions.** Low byte `08`, with the target type in the high byte
+  under the same `(high - 1) / 4` rule: `0508` is `CINT`, `0908` `CLNG`,
+  `0d08` `CSNG`, `1108` `CDBL`.
+- **Literals.** Low byte `65` takes the value in the following word; `016b`
+  takes a 32-bit float in the next two and `016c` a 64-bit one in the next
+  four; `016d` is a string, a word count followed by that many bytes.
+
+Length-prefixed payloads are padded to a word boundary. String literals are
+padded with the closing `"` rather than a zero.
+
+### Untokenized lines
+
+A tokenized file can contain lines that were never tokenized. When QB cannot
+parse a line it stores the source verbatim under opcode `000a`, in the same
+`[u16 field][text]` shape a comment uses. A detokenizer has to emit those back
+as they are.
+
+`TYPES.BAS` shows it: its `TYPE` member is called `Name`, which is the QB
+`NAME` statement, so the declaration was rejected -- and with it every later
+line mentioning `Solo.Name`. `REDIM PRESERVE` went the same way; QB 4.5 has no
+`PRESERVE`. **Verified**: every `000a` payload in the corpus appears verbatim
+in QB's text output.
+
+### Stored source text
+
+Comment text is **run-length encoded**: `0x0d <count> <char>` stands for
+`count` copies of `char`, which is how `TORUS` stores its banner comments.
+The comment opcode's payload is a leading word followed by the text, and that
+word is the **column the apostrophe sits at** -- which is what lets QB put an
+inline `X = 1    ' note` back where it was.
+
+**Verified**: 458 comments across the corpus expand to exactly the text QB
+emitted, and the column matches the position of the quote on 218 of the 220
+lines that can be checked. The two exceptions are `DIM ... AS <type>` lines,
+where the same opcode carries a payload that is not source text at all -- its
+leading word is 1 and its body contains NUL bytes. That form is not understood
+yet, so callers test for NUL before treating a payload as text.
+
+QB's text writer trims trailing whitespace, so a stored comment can be longer
+at the right than the line it produced.
+
+### Jump targets are filled in by running the program
+
+Control-flow operands -- the target on `IF ... THEN`, `ELSE`, loop ends -- are
+**zero in a file that has been loaded from text and saved without running**.
+QB back-patches them when it compiles.
+
+**Verified**: `samples/EDIT1.BAS` saved after pressing F5 is `TRAIL1` saved
+without running, and
+the two token streams differ in exactly one word: the `IF`'s target, 0 before
+and 116 after. This matters mostly as a warning -- an unresolved target is not
+a decoding error.
+
+### DEFtype records
+
+`DEFINT`/`DEFLNG`/`DEFSNG`/`DEFDBL`/`DEFSTR` share opcode `001b` and three
+words:
+
+    u16  reference of the next DEFtype record, 0xffff for the last
+    u16  letters Q-Z in bits 15..6, the type code in the low six bits
+    u16  letters A-P, with A at bit 15
+
+Type codes match the ones in a procedure signature: 1 INTEGER, 2 LONG, 3
+SINGLE, 4 DOUBLE, 5 STRING. **Verified**: `DEFTYPE.BAS` declares one range per
+type and produces exactly `e000 1c00 0380 0070 000e` with codes 1 to 5, and
+`TORUS`'s `DEFINT A-Z` sets every letter in both masks.
+
+### Signatures
+
+`DECLARE` (`0044`), `FUNCTION` (`0058`) and `SUB` (`0076`) each carry a
+length-prefixed signature:
+
+    u16  procedure reference
+    u16  0x0100
+    u16  parameter count
+    then per parameter: u16 reference, u16 0x0200, u16 type
+
+Parameter types are `1` INTEGER, `2` LONG, `3` SINGLE, `4` DOUBLE, `5` STRING.
+**Verified**: `DESCFILE`'s single `DECLARE` unpacks to exactly
+`IdentifyFile(FileName$, Description$, DescriptionLen%)`.
+
+### Parentheses are recorded, not inferred
+
+There is no precedence table to reconstruct. QB stores the parentheses the
+programmer wrote as an explicit opcode (`016e`), redundant ones included, so
+rendering an expression is just a stack walk. `DRAWSCR1`'s
+
+    Bytes% = 4 + INT(((320 - 1 + 1) * (2) + 7) / 8) * 1 * ((200 - 1) + 1)
+
+comes back with its `(2)` and its `((200 - 1) + 1)` intact.
+
+### Parameter lists
+
+A parameter's mode word records how it was *written*, not merely its type:
+
+| Bit | Meaning |
+|---|---|
+| `0x0200` | a type suffix was written (`First%`) |
+| `0x0400` | an array (`Array()`) |
+| `0x1000` | `BYVAL` |
+| `0x2000` | an `AS` clause rather than a suffix |
+
+They combine, and the suffix goes inside the parentheses: `Array#()`. A bare
+`0x0000` means the name was written with no suffix at all, taking its type
+from a `DEF<type>`. **Verified**: `MATTMENU`'s 297 declarations round-trip,
+including `MeanAverageD (Array#(), First%, ...)` and `FarPeek% (BYVAL DSeg%,
+BYVAL DOfs%)`.
+
+A `DECLARE` always writes its parentheses, even when there are no parameters;
+a `SUB` or `FUNCTION` definition omits them.
+
+### Layout
+
+QB writes the module text first, then the procedures **sorted by name** --
+not in the order the sections sit in the file. Each section is followed by a
+blank line, unless it already ended with one.
+
+The hidden `DEFtype` record at the head of each procedure is counted as a line
+but never printed, so it has to be dropped when rendering.
+
+### Coverage
+
+`src/qb45detok/tokens.py` holds the opcodes identified so far. Against the
+whole corpus that accounts for **99.95% of the 13,507 opcodes**, with **86 of
+87 sections** decoding to exactly the line count their trailer records and
+decoded indentation matching QB's text output on all 2,562 procedure lines
+that can be checked. `qb45detok stats FILE` reports this per file.
+
+Rendering those tokens back to source reproduces **15 of the 19 corpus files
+byte for byte**, the largest of them 353 lines. The four that do not are the
+biggest, and in each case a single unrendered line shifts everything after it,
+so the line-level figure understates how close they are.
+
+### Known unknowns
+
+- `0017` appears at the end of some `SUB`, `DECLARE`, `IF ... THEN` and
+  `PRINT ... ;` lines and not others, with no visible difference in the source
+  text. It takes no operands, so it does not affect the walk. Three
+  hypotheses are now ruled out by experiment:
+
+  - **Trailing whitespace.** QB strips it on load, and `TRAIL1`/`TRAIL2` came
+    out without `0017` on any line despite carrying all four constructs.
+  - **A compile artefact.** `EDIT1QB.BAS` is the same program after running.
+    It gained a resolved jump target and no `0017`.
+  - **Padding.** It is always the last word on its line, but lines carrying it
+    split across `length mod 4` in the same proportion as lines without it.
+  - **A trailing colon.** Of the 54 procedure lines that carry it, none ends
+    with a colon in the text QB wrote.
+
+  What is known: 80 occurrences, in four files only, always last on the line,
+  and nearly consistent per procedure -- every mention of `Press.Any.Key` in
+  `DIRMAST` has it and no mention of `ClrKbd` does -- but three procedures in
+  `DRAWSCR1` have it on one mention and not another, so it is not simply a
+  property of the name.
+- Six opcodes remain unidentified, all with one or two occurrences, and one
+  section still decodes to the wrong line count.
+- The `DIM ... AS <type>` payload described above.
+- The trailing word on statements like `LOCATE` and `COLOR` is twice the
+  argument count, but on `LINE` it is the `B`/`BF` shape flag and on `PUT` the
+  raster action -- so it is statement-specific, not a general argument count.
+- Header offsets `0x12` and `0x14`-`0x19`, and `unknown_a`/`unknown_c` in the
+  section trailer.
+
+### What would help most
+
+`TORUS` and `JOHNNY` closed most of the earlier gaps: between them they
+supplied `TYPE ... END TYPE`, `SELECT CASE`, `ON ERROR`/`RESUME`, `GOSUB`,
+`DEFINT`, `SWAP`, `PALETTE`, `PLAY` and double-precision arithmetic.
+
+The programs in `samples/` closed the rest: file I/O, `DEF FN`,
+`CONST`, `COMMON`, `STATIC`, all five `DEF<type>` ranges, `EXIT FOR`/`EXIT DO`,
+double-precision literals and the numeric function set.
+
+Still unreachable: random-access files (`FIELD`, `GET #`, `PUT #`, `LSET`,
+`RSET`), `CHAIN`, `RUN`, `DRAW`, `ON TIMER`, `IOCTL`, and fixed-length strings
+that QB actually accepts -- `TYPES.BAS` provoked a rejection instead, and
+`samples/TYPES2.BAS` is the corrected retry.

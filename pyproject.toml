@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qb45detok"
+version = "0.1.0"
+description = "Convert Microsoft QuickBASIC 4.5 binary .BAS files (the 0xFC format) back to readable BASIC source text"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "Mark Earnest" }]
+keywords = [
+    "quickbasic", "qbasic", "qb45", "basic", "detokenizer", "detokenize",
+    "tokenized", "retrocomputing", "msdos", "dos", "file-format",
+    "reverse-engineering",
+]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Disassemblers",
+]
+
+[project.urls]
+Homepage = "https://github.com/mark-iid/qb45detok"
+"Format notes" = "https://github.com/mark-iid/qb45detok/blob/main/docs/format.md"
+
+[project.scripts]
+qb45detok = "qb45detok.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

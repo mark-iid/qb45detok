@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+
+# Test data: programs saved twice by QB 4.5, once tokenized and once as text.
+# Not distributed -- see "Testing" in README.md.
+corpus/

@@ -1,0 +1,97 @@
+"""Tests for turning decoded tokens back into source.
+
+The corpus is an exact oracle here: QB wrote the text itself, so a rendering
+is right only if it matches byte for byte. These tests pin down the files that
+already round-trip and guard the overall line-match rate against regressions.
+"""
+
+import pytest
+
+from conftest import requires_corpus,   CORPUS_BIN, CORPUS_TXT, NAMES
+from qb45detok import BinFile
+from qb45detok.decode import decode_file
+from qb45detok.render import Renderer, format_double, format_single
+
+pytestmark = requires_corpus
+
+#: Files that reproduce QB's text output byte for byte. Add to this as the
+#: renderer improves; removing one is a regression.
+BYTE_IDENTICAL = [
+    "DEFFN.BAS", "DEFTYPE.BAS", "DESCFILE.BAS", "DRAWSCR1.BAS", "FILEIO.BAS",
+    "JOHNNY.BAS", "MAINMENU.BAS", "MATTMENU.BAS", "MISC.BAS", "OBJSCAN.BAS",
+    "PHYSICS.BAS", "TRAIL1.BAS", "TRAIL2.BAS", "TYPES.BAS", "TYPES2.BAS",
+]
+
+#: Lower bound on the share of lines rendered exactly across the corpus.
+MIN_LINE_MATCH = 0.64
+
+
+def render(name):
+    bf = BinFile.from_path(CORPUS_BIN / name)
+    return Renderer(bf).file(decode_file(bf))
+
+
+def expected(name):
+    text = (CORPUS_TXT / name).read_text(encoding="latin-1", newline="")
+    lines = text.split("\r\n")
+    if lines and lines[-1] == "":
+        lines.pop()  # the file's own trailing newline
+    return lines
+
+
+@pytest.mark.parametrize("name", BYTE_IDENTICAL)
+def test_round_trips_byte_for_byte(name):
+    produced = "".join(line + "\r\n" for line in render(name))
+    assert produced == (CORPUS_TXT / name).read_text(encoding="latin-1", newline="")
+
+
+def test_line_match_rate():
+    matched = total = 0
+    for name in NAMES:
+        want = expected(name)
+        got = render(name)
+        total += len(want)
+        matched += sum(1 for a, b in zip(got, want) if a.rstrip() == b.rstrip())
+    rate = matched / total
+    assert rate >= MIN_LINE_MATCH, f"render quality regressed to {rate:.1%}"
+
+
+def test_rendering_never_raises():
+    """A line the renderer cannot express is marked, not fatal."""
+    for name in NAMES:
+        for line in render(name):
+            assert isinstance(line, str)
+
+
+def test_descfile_is_exact():
+    assert render("DESCFILE.BAS") == expected("DESCFILE.BAS")
+
+
+def test_parentheses_are_recorded_not_inferred():
+    """QB stores the parentheses that were written, redundant ones included."""
+    line = next(l for l in render("DRAWSCR1.BAS") if l.startswith("Bytes% ="))
+    assert line == "Bytes% = 4 + INT(((320 - 1 + 1) * (2) + 7) / 8) * 1 * ((200 - 1) + 1)"
+
+
+
+def test_deftype_ranges_render():
+    lines = render("DEFTYPE.BAS")
+    assert "DEFINT A-C" in lines
+    assert "DEFLNG D-F" in lines
+    assert "DEFSTR M-O" in lines
+    assert "DEFINT A-Z" in render("TORUS.BAS")
+
+
+def test_parameter_forms():
+    """The mode word decides suffix, array, BYVAL and AS forms."""
+    lines = render("MATTMENU.BAS")
+    assert "DECLARE SUB MeanAverageD (Array#(), First%, Last%, Average#, ErrCode%)" in lines
+    assert "DECLARE FUNCTION FarPeek% (BYVAL DSeg%, BYVAL DOfs%)" in lines
+    # A DECLARE keeps its parentheses even with no parameters.
+    assert any(l.startswith("DECLARE SUB ") and l.endswith(" ()") for l in lines)
+
+
+def test_hidden_deftype_line_is_not_printed():
+    """The DEFtype record copied into each procedure has no source form."""
+    lines = render("TORUS.BAS")
+    assert lines.count("DEFINT A-Z") == 1
