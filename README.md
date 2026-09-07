@@ -30,7 +30,7 @@ head -c 1 OLDPROG.BAS | od -An -tx1
 | `f9`, `f1`, `f3` | older Microsoft BASIC | [decode_ms_basic.py] |
 | printable text | already ASCII | nothing to do |
 
-Only the `fc` row is something I have verified myself, across nineteen files.
+Only the `fc` row is something I have verified myself, across thirty-one files.
 The rest is from those projects' own documentation, and is here so you do not
 waste time on the wrong tool, as I did.
 
@@ -95,13 +95,19 @@ qb45detok stats PROGRAM.BAS        # how much of the token stream is identified
 
 ## How well it works
 
-Across the twenty-six programs I have tested it on (my own code, a QuickBASIC
+Across the thirty-one programs I have tested it on (my own code, a QuickBASIC
 sample, and small programs written to exercise one feature each) **every one
 comes back byte for byte identical** to what QuickBASIC itself writes with
 Save As Text. The largest is 1,091 lines.
 
-Every opcode in those programs is identified, and all 95 code sections decode
+Every opcode in those programs is identified, and all 101 code sections decode
 to exactly the line count the file records for them.
+
+I also checked the opcode table against the 224 keywords in the QuickBASIC 4.5
+help index. Every documented statement and function is covered. The only index
+entries left over are `ABSOLUTE`, `INTERRUPT` and `INTERRUPTX`, which are
+routines in `QB.QLB` rather than keywords, and which come through as ordinary
+`CALL` targets.
 
 Nothing is guessed at silently. If the decoder cannot express a statement it
 writes a marker on that line rather than dropping it or inventing something,
@@ -116,8 +122,8 @@ and `detok` exits non-zero so you know to look.
 - A statement I have not run through it would show up as a marked line rather
   than silently wrong output.
 
-`docs/format.md` lists the open questions, including four hypotheses I ruled
-out by experiment so nobody repeats them.
+`docs/format.md` lists the open questions, including the hypotheses I ruled out
+by experiment so nobody repeats them.
 
 ## Testing
 

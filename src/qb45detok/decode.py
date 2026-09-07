@@ -85,7 +85,8 @@ class Param:
     ref: int
     type_code: int
     #: Bit field describing how the parameter was written:
-    #: 0x0200 a type suffix, 0x0400 an array, 0x1000 BYVAL, 0x2000 an AS clause.
+    #: 0x0200 a type suffix, 0x0400 an array, 0x0800 SEG, 0x1000 BYVAL,
+    #: 0x2000 an AS clause.
     mode: int = 0x0200
 
     @property
@@ -95,6 +96,10 @@ class Param:
     @property
     def by_value(self) -> bool:
         return bool(self.mode & 0x1000)
+
+    @property
+    def by_segment(self) -> bool:
+        return bool(self.mode & 0x0800)
 
     @property
     def has_as_clause(self) -> bool:
@@ -115,14 +120,42 @@ class Signature:
 
     ref: int
     params: List[Param] = field(default_factory=list)
-    kind: int = 0x0100  #: high byte SUB/FUNCTION, low byte the return type
+    #: High byte: bits 0-1 are 1 for SUB and 2 for FUNCTION, bit 7 is CDECL,
+    #: and bits 2-6 hold the length of the ALIAS string. Low byte is the
+    #: return type.
+    kind: int = 0x0100
     listed: bool = True  #: False when the source wrote no parentheses at all
+    alias: str = ""  #: the ALIAS name, when one was written
+
+    @property
+    def is_function(self) -> bool:
+        return bool(self.kind >> 8 & 0x03) and (self.kind >> 8 & 0x03) == 2
+
+    @property
+    def cdecl(self) -> bool:
+        return bool(self.kind & 0x8000)
+
+    @property
+    def alias_len(self) -> int:
+        return (self.kind >> 10) & 0x1F
 
     @property
     def return_suffix(self) -> str:
         """The type suffix written on a FUNCTION's own name, if any."""
         low = self.kind & 0xFF
         return tokens.PARAM_TYPES.get(low & 0x7F, "") if low & 0x80 else ""
+
+
+def _alias(payload: bytes, kind: int, off: int) -> str:
+    """The ALIAS string, whose length lives in bits 2-6 of the kind high byte.
+
+    It is stored unterminated after the parameter list and padded to an even
+    length, so the length word is the only way to find its end.
+    """
+    n = (kind >> 10) & 0x1F
+    if not n or len(payload) < off + n:
+        return ""
+    return payload[off : off + n].decode("latin-1")
 
 
 def parse_signature(payload: bytes) -> Optional[Signature]:
@@ -134,14 +167,16 @@ def parse_signature(payload: bytes) -> Optional[Signature]:
     if count == 0xFFFF:
         # No parameter list at all, as in "DECLARE FUNCTION Top10&", which is
         # different from an empty one written as "()".
-        return Signature(ref=word(0), params=[], kind=word(2), listed=False)
+        return Signature(ref=word(0), params=[], kind=word(2), listed=False,
+                         alias=_alias(payload, word(2), 6))
     if len(payload) < 6 + 6 * count:
         return None
     params = [
         Param(ref=word(6 + 6 * i), mode=word(8 + 6 * i), type_code=word(10 + 6 * i))
         for i in range(count)
     ]
-    return Signature(ref=word(0), params=params, kind=word(2), listed=True)
+    return Signature(ref=word(0), params=params, kind=word(2), listed=True,
+                     alias=_alias(payload, word(2), 6 + 6 * count))
 
 
 @dataclass

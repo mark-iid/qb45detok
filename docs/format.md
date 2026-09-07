@@ -74,12 +74,16 @@ For `flags` `0x00` and `0x40` the payload is the identifier as ASCII.
 | flags | Meaning |
 |---|---|
 | `0x00` | plain name (variable, label, external) |
-| `0x40` | procedure |
+| `0x40` | a name used in statement position: a `SUB`, or a `CALL` target |
 | `0x02`, `0x04`, `0x06` | not a name, a 2-byte binary payload, unknown. Only in `DIRMAST`, `DRAWSCR1`, `PROJECT2`, `STARDEF`, the files with line numbers, `TYPE` and `DATA` |
 
-`0x40` is *about* procedures but is not simply "has a `DECLARE`": in `DIRMAST`
-13 declared procedures lack it and in `STARDEF` three flagged names have no
-`DECLARE`. The exact rule is not yet known.
+`0x40` marks `SUB`s, not procedures in general. Across the corpus it is set on
+all 383 `SUB` names and on none of the 93 `FUNCTION` names, with no exceptions.
+That is why `DIRMAST` has declared procedures without it: they are functions.
+It is also set on names that have no `DECLARE` at all but are used as a `CALL`
+target, such as `ABSOLUTE`, so the rule is about statement position rather than
+about being declared. Reading it is the cheapest way to tell a `SUB` from a
+`FUNCTION` without decoding a signature.
 
 The table also holds names that appear nowhere in the source. `OBJSCAN` has
 `dir`, `Rotinue`, `Rotine` and `NMALLOC` for a 28-line program. QB evidently
@@ -214,6 +218,12 @@ Three families are encoded rather than enumerated:
 Length-prefixed payloads are padded to a word boundary. String literals are
 padded with the closing `"` rather than a zero.
 
+### Reserved words that are not statements
+
+`SIGNAL` and `LOCAL` appear in the 4.5 keyword index but have no syntax in 4.5.
+QB parses neither and stores both lines as raw source text, which is the same
+path a line with a genuine syntax error takes. They round-trip unchanged.
+
 ### Untokenized lines
 
 A tokenized file can contain lines that were never tokenized. When QB cannot
@@ -279,13 +289,49 @@ type and produces exactly `e000 1c00 0380 0070 000e` with codes 1 to 5, and
 length-prefixed signature:
 
     u16  procedure reference
-    u16  0x0100
-    u16  parameter count
-    then per parameter: u16 reference, u16 0x0200, u16 type
+    u16  kind
+    u16  parameter count, or 0xffff when no list was written at all
+    then per parameter: u16 reference, u16 mode, u16 type
+    then the ALIAS string, unpadded, its length taken from `kind`
 
 Parameter types are `1` INTEGER, `2` LONG, `3` SINGLE, `4` DOUBLE, `5` STRING.
 Verified: `DESCFILE`'s single `DECLARE` comes out as
 `IdentifyFile(FileName$, Description$, DescriptionLen%)`.
+
+The `kind` word packs four things:
+
+| Bits | Meaning |
+|---|---|
+| high `0x03` | `1` a `SUB`, `2` a `FUNCTION` |
+| high `0x7c` | the length of the `ALIAS` string, shifted left two |
+| high `0x80` | `CDECL` |
+| low | the `FUNCTION`'s own return type, with `0x80` set when a suffix was written |
+
+So `DECLARE SUB Ext CDECL ALIAS "extfn" (BYVAL N%)` gives `0x9500`: `0x01` for
+`SUB`, `0x80` for `CDECL`, and `5 << 2` for the five characters of `extfn`.
+
+The `ALIAS` string follows the parameter list with no length byte and no
+terminator, padded to an even length with whatever byte followed it in the
+source, usually the closing quote. The length in `kind` is the only way to find
+its end. Verified across fourteen declarations covering every combination of
+`CDECL`, `ALIAS` and `BYVAL`, with alias lengths from one to five.
+
+### OPEN's mode word
+
+`OPEN` (`00c9`) carries one trailing word holding the whole of the clause
+between `FOR` and `AS`:
+
+| Part | Meaning |
+|---|---|
+| low byte | 1 `INPUT`, 2 `OUTPUT`, 4 `RANDOM`, 8 `APPEND`, 32 `BINARY` |
+| high `0x03` | the `ACCESS` clause: 1 `READ`, 2 `WRITE`, 3 `READ WRITE` |
+| high `0x70` | sharing: `0x10` `LOCK READ WRITE`, `0x20` `LOCK WRITE`, `0x30` `LOCK READ`, `0x40` `SHARED` |
+
+So `OPEN "T.DAT" FOR RANDOM ACCESS READ WRITE SHARED AS #2` is `0x4304`.
+Verified over all ten combinations QB 4.5 accepts.
+
+The pre-4.0 form, `OPEN "R", #1, "F.DAT", 128`, is a different opcode (`00cc`)
+with no trailing word, and its arguments are already in source order.
 
 ### Parentheses are stored, not worked out from precedence
 
@@ -305,6 +351,7 @@ A parameter's mode word records how it was written, not its type:
 |---|---|
 | `0x0200` | a type suffix was written (`First%`) |
 | `0x0400` | an array (`Array()`) |
+| `0x0800` | `SEG` |
 | `0x1000` | `BYVAL` |
 | `0x2000` | an `AS` clause rather than a suffix |
 
@@ -338,12 +385,19 @@ leaves it on a line that is only whitespace.
 ### Coverage
 
 `src/qb45detok/tokens.py` holds the opcodes identified so far. Against the
-whole corpus that accounts for every one of the 13,527 opcodes, with all 87 sections decoding to exactly the line count their trailer records and
-decoded indentation matching QB's text output on all 2,562 procedure lines
-that can be checked. `qb45detok stats FILE` reports this per file.
+whole corpus that accounts for every one of the 14,069 opcodes, with all 101
+sections decoding to exactly the line count their trailer records and decoded
+indentation matching QB's text output on every procedure line that can be
+checked. `qb45detok stats FILE` reports this per file.
 
-Rendering those tokens back to source reproduces 18 of the 19 corpus files byte for byte, the largest of them 1,091 lines, and 4,517 of 4,518 lines
-overall. The one exception is a single line in `DIRMAST` described below.
+Rendering those tokens back to source reproduces all 31 corpus files byte for
+byte, the largest of them 1,091 lines, and all 4,731 lines overall.
+
+Cross-checked against the 224 keywords in the QB 4.5 help index, every
+documented statement and function is either an identified opcode or handled by
+one of the encoding rules. The three remaining index entries are not language
+keywords: `ABSOLUTE`, `INTERRUPT` and `INTERRUPTX` are routines in `QB.QLB`
+that reach the file as ordinary `CALL` targets.
 
 ### Known unknowns
 
@@ -375,8 +429,8 @@ overall. The one exception is a single line in `DIRMAST` described below.
   `DRAWSCR1` have it on one mention and not another, so it is not simply a
   property of the name.
 - The `PUT` raster operations are 0 `OR`, 1 `AND`, 2 `PRESET`, 3 `PSET`,
-  4 `XOR`. `OPEN` modes are 1 `INPUT`, 2 `OUTPUT`, 4 `RANDOM`, 8 `APPEND`,
-  32 `BINARY`; 16 has not been seen.
+  4 `XOR`. `OPEN`'s trailing word is described below; only bit 16 of its low
+  byte and bit `0x08` of its high byte have not been seen.
 - The `DIM ... AS <type>` payload described above.
 - The trailing word on statements like `LOCATE` and `COLOR` is twice the
   argument count, but on `LINE` it is the `B`/`BF` shape flag and on `PUT` the

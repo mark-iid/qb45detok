@@ -34,7 +34,7 @@ def cmd_dump(args) -> int:
     print(f"  bytes 0x12,0x13  : {d[0x12]:#04x} {d[0x13]:#04x}")
     print(f"  code ref         : {bf.code_ref:#06x} -> file offset {bf.code_ref + REF_BASE:#07x}")
     print(f"  name table end   : {bf.free_ref:#06x} -> file offset {bf.free_ref + REF_BASE:#07x}")
-    print(f"  names            : {len(bf.names)} ({len(bf.procedures())} procedures)")
+    print(f"  names            : {len(bf.names)} ({len(bf.subs())} subs)")
     print(f"  sections         : {len(bf.sections)}")
     for sec in bf.sections:
         print(f"    {_describe(sec)}")
@@ -53,10 +53,10 @@ def cmd_dump(args) -> int:
 def cmd_names(args) -> int:
     bf = BinFile.from_path(args.file)
     for entry in bf.names.values():
-        if args.procs and not entry.is_proc:
+        if args.procs and not entry.is_sub:
             continue
-        if entry.is_proc:
-            kind = "proc"
+        if entry.is_sub:
+            kind = "sub"
         elif entry.flags == 0x04:
             kind = "label"
         elif entry.is_text:
@@ -179,7 +179,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     n = sub.add_parser("names", help="list the name table")
     n.add_argument("file")
-    n.add_argument("--procs", action="store_true", help="only SUB/FUNCTION entries")
+    n.add_argument("--procs", action="store_true", help="only SUB and CALL-target entries")
     n.set_defaults(func=cmd_names)
 
     s = sub.add_parser("sections", help="list code sections, optionally hexdumping them")

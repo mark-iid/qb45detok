@@ -19,7 +19,7 @@ def test_names_procs_only(capsys):
     assert main(["names", SAMPLE, "--procs"]) == 0
     lines = capsys.readouterr().out.splitlines()
     assert len(lines) == 10
-    assert all("proc" in line for line in lines)
+    assert all("sub" in line for line in lines)
 
 
 def test_sections_hexdump(capsys):

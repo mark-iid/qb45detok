@@ -10,7 +10,8 @@ import pytest
 
 from conftest import requires_corpus,   CORPUS_BIN, CORPUS_TXT, NAMES, text_blocks
 from qb45detok import BinFile, ParseError
-from qb45detok.decode import decode_file
+from qb45detok import tokens
+from qb45detok.decode import decode_file, parse_signature
 from qb45detok.reader import MAGIC, NAMES_OFF, REF_BASE
 
 pytestmark = requires_corpus
@@ -46,7 +47,7 @@ def procedures_in_text(text):
 
 
 def test_corpus_is_present():
-    assert len(NAMES) == 26, "expected twenty-six matched pairs in corpus/"
+    assert len(NAMES) == 31, "expected thirty-one matched pairs in corpus/"
 
 
 def test_parses(pair):
@@ -140,16 +141,33 @@ def test_procedure_names_are_also_in_the_name_table(pair):
         assert sec.name.lower() in table
 
 
-def test_flag_0x40_marks_procedures(pair):
-    """Most procedure sections carry FLAG_PROC on their name-table entry.
+def _signature_for(bf, name):
+    """The DECLARE/SUB/FUNCTION signature naming ``name``, if the file has one."""
+    for ds in decode_file(bf):
+        for line in ds.lines:
+            for ins in line.instrs:
+                if ins.code not in tokens.SIGNATURE_OPS or not ins.payload:
+                    continue
+                sig = parse_signature(ins.payload)
+                entry = bf.symbol(sig.ref) if sig else None
+                if entry and entry.name and entry.name.lower() == name.lower():
+                    return sig
+    return None
 
-    Not all of them do -- see docs/format.md -- so this only pins down that
-    the flag is about procedures rather than something unrelated.
+
+def test_flag_0x40_marks_subs_not_functions(pair):
+    """Flag 0x40 is set on SUB names and never on a FUNCTION name.
+
+    Across the corpus this holds for every declaration, which is what tells
+    the two apart in the name table without reading a signature.
     """
     _, bf, _ = pair
-    flagged = {e.name.lower() for e in bf.procedures()}
-    defined = {s.name.lower() for s in bf.sections[1:]}
-    assert defined - flagged != defined or not defined
+    flagged = {e.name.lower() for e in bf.subs()}
+    for sec in bf.sections[1:]:
+        sig = _signature_for(bf, sec.name)
+        if sig is None:
+            continue
+        assert (sec.name.lower() in flagged) is not sig.is_function
 
 
 

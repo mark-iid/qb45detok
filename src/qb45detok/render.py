@@ -79,14 +79,33 @@ class Renderer:
     #: Trailing word on PUT, giving the raster operation. All five confirmed.
     PUT_ACTIONS = {0: "OR", 1: "AND", 2: "PRESET", 3: "PSET", 4: "XOR"}
 
-    #: How OPEN's trailing word names the access mode.
+    #: The low byte of OPEN's trailing word names the FOR mode.
     OPEN_MODES = {1: "INPUT", 2: "OUTPUT", 4: "RANDOM", 8: "APPEND", 32: "BINARY"}
+
+    #: Bits 0-1 of the high byte are the ACCESS clause.
+    OPEN_ACCESS = {1: "READ", 2: "WRITE", 3: "READ WRITE"}
+
+    #: Bits 4-6 of the high byte are the sharing clause.
+    OPEN_LOCKS = {0x10: "LOCK READ WRITE", 0x20: "LOCK WRITE",
+                  0x30: "LOCK READ", 0x40: "SHARED"}
+
+    def _open_clauses(self, word: int) -> str:
+        """The ACCESS and lock clauses that sit between FOR and AS."""
+        out = ""
+        access = self.OPEN_ACCESS.get(word >> 8 & 0x03)
+        if access:
+            out += f" ACCESS {access}"
+        lock = self.OPEN_LOCKS.get(word >> 8 & 0x70)
+        if lock:
+            out += f" {lock}"
+        return out
 
     #: KEY's mode word: OFF, ON or LIST.
     KEY_MODES = {0: "OFF", 1: "ON", 2: "LIST"}
 
     #: The event selector opcodes render as KEY(n), STRIG(n), TIMER(n).
-    EVENT_TEXT = {"STRIG_EVENT": "STRIG", "KEY_EVENT": "KEY", "TIMER_SELECT": "TIMER"}
+    EVENT_TEXT = {"STRIG_EVENT": "STRIG", "KEY_EVENT": "KEY",
+                  "TIMER_SELECT": "TIMER", "COM_EVENT": "COM"}
 
     #: Statements whose arguments are simply everything left on the stack.
     LIST_STATEMENTS = frozenset({
@@ -262,7 +281,9 @@ class Renderer:
             elif mn == "FIELD_ITEM":
                 width, target = pop(2)
                 stack.append(f"{width} AS {target}")
-            elif mn in ("STRIG_EVENT", "KEY_EVENT", "TIMER_SELECT"):
+            elif mn in ("PEN_EVENT", "UEVENT"):
+                stack.append(op.text)
+            elif mn in ("STRIG_EVENT", "KEY_EVENT", "TIMER_SELECT", "COM_EVENT"):
                 (which,) = pop()
                 stack.append(f"{self.EVENT_TEXT[mn]}({which})")
             elif mn in ("EVENT_ON", "EVENT_OFF", "EVENT_STOP"):
@@ -360,18 +381,24 @@ class Renderer:
                 (channel,) = pop()
             elif mn == "OPEN_RANDOM":
                 argv = pop(len(stack))
-                mode = self.OPEN_MODES.get(ins.operands[0] if ins.operands else 4, "RANDOM")
+                word = ins.operands[0] if ins.operands else 4
+                mode = self.OPEN_MODES.get(word & 0xFF, "RANDOM")
                 target, chan = argv[0], argv[1]
                 length = argv[2] if len(argv) > 2 else None
-                text = f"OPEN {target} FOR {mode} AS {chan}"
+                text = f"OPEN {target} FOR {mode}{self._open_clauses(word)} AS {chan}"
                 emit(text + (f" LEN = {length}" if length else ""))
             elif mn == "OPEN":
                 argv = pop(len(stack))
-                mode = self.OPEN_MODES.get(ins.operands[0] if ins.operands else 0)
+                word = ins.operands[0] if ins.operands else 0
+                mode = self.OPEN_MODES.get(word & 0xFF)
                 chan = argv[-1] if argv else ""
                 target = ", ".join(argv[:-1])
-                emit(f"OPEN {target} FOR {mode} AS {chan}" if mode
-                     else f"OPEN {target} AS {chan}")
+                emit(f"OPEN {target} FOR {mode}{self._open_clauses(word)} AS {chan}"
+                     if mode else f"OPEN {target} AS {chan}")
+            elif mn == "OPEN_MODE_STRING":
+                # The pre-4.0 form, "OPEN mode$, #n, file$[, reclen]", whose
+                # arguments are already in source order.
+                emit(f"OPEN {', '.join(pop(len(stack)))}")
             elif mn == "CLOSE":
                 argv = pop(len(stack))
                 emit(f"CLOSE {', '.join(argv)}".rstrip())
@@ -457,12 +484,13 @@ class Renderer:
                 else:
                     emit("CLS " if marks else "CLS")
                 marks = []
-            elif mn in ("CALL", "CALL_IMPLICIT"):
+            elif mn in ("CALL", "CALLS", "CALL_IMPLICIT"):
                 count = ins.operands[0]
                 argv = pop(count) if count else []
                 name = self.name(ins.operands[1])
-                if mn == "CALL":
-                    emit(f"CALL {name}({', '.join(argv)})" if argv else f"CALL {name}")
+                if mn in ("CALL", "CALLS"):
+                    emit(f"{mn} {name}({', '.join(argv)})" if argv
+                         else f"{mn} {name}")
                 else:
                     emit(f"{name} {', '.join(argv)}".rstrip())
             elif mn == "END_SUB":
@@ -657,7 +685,12 @@ class Renderer:
         name = self.name(sig.ref) + sig.return_suffix
         params = ", ".join(self._param(p) for p in sig.params)
         if ins.mnemonic == "DECLARE":
-            keyword = "DECLARE FUNCTION" if sig.kind >> 8 == 2 else "DECLARE SUB"
+            keyword = "DECLARE FUNCTION" if sig.is_function else "DECLARE SUB"
+            # CDECL and ALIAS sit between the name and the parameter list.
+            if sig.cdecl:
+                name += " CDECL"
+            if sig.alias:
+                name += f' ALIAS "{sig.alias}"'
         else:
             keyword = ins.mnemonic
         if not sig.listed:
@@ -694,7 +727,9 @@ class Renderer:
             text += "()"
         if p.has_as_clause:
             text += " AS " + self._type_name(p.type_code)
-        return "BYVAL " + text if p.by_value else text
+        if p.by_value:
+            return "BYVAL " + text
+        return "SEG " + text if p.by_segment else text
 
     #: The three DEFTYPE words are a link, then Q-Z plus the type code, then
     #: A-P with A at the top bit.

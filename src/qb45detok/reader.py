@@ -48,8 +48,8 @@ FLAG_USER_TYPE = 0x08  # variable whose type is a user-defined TYPE
 FLAG_NUM_LABEL_A = 0x02  # numeric line label, u16 payload
 FLAG_LABEL = 0x04  # alphanumeric line label (GOTO/GOSUB target)
 FLAG_NUM_LABEL = 0x06  # numeric line label, u16 payload
-FLAG_PROC = 0x40  # SUB / FUNCTION
-_TEXT_FLAGS = (FLAG_NAME, FLAG_USER_TYPE, FLAG_LABEL, FLAG_PROC)
+FLAG_SUB = 0x40  # a name used in statement position: a SUB, or a CALL target
+_TEXT_FLAGS = (FLAG_NAME, FLAG_USER_TYPE, FLAG_LABEL, FLAG_SUB)
 _NUM_FLAGS = (FLAG_NUM_LABEL_A, FLAG_NUM_LABEL)
 
 
@@ -72,8 +72,9 @@ class NameEntry:
         return self.flags in _TEXT_FLAGS
 
     @property
-    def is_proc(self) -> bool:
-        return bool(self.flags & FLAG_PROC)
+    def is_sub(self) -> bool:
+        """Set for SUB names and CALL targets, never for a FUNCTION."""
+        return bool(self.flags & FLAG_SUB)
 
     @property
     def is_label(self) -> bool:
@@ -320,5 +321,5 @@ class BinFile:
             ref = entry.link
         return out
 
-    def procedures(self) -> Sequence[NameEntry]:
-        return [e for e in self.names.values() if e.is_proc]
+    def subs(self) -> Sequence[NameEntry]:
+        return [e for e in self.names.values() if e.is_sub]
