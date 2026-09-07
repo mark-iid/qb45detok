@@ -693,6 +693,12 @@ class Renderer:
                 argv = pop(len(stack))
                 head = f"({argv[0]}, {argv[1]})-({argv[2]}, {argv[3]})"
                 rest = argv[4:]
+                # VIEW takes an optional colour and border. An ARG marker
+                # stands for a slot that was left out, so one marker with one
+                # value means the colour went missing: "VIEW ..., , 1".
+                omitted = sum(1 for x in line.instrs if x.mnemonic == "ARG")
+                if omitted == 1 and len(rest) == 1:
+                    rest = [""] + rest
                 emit((f"{op.text} " + ", ".join([head] + rest)).rstrip())
             elif mn in ("VIEW_BARE", "WINDOW_BARE", "SHELL_BARE",
                         "FILES_BARE", "RANDOMIZE_BARE", "SLEEP_BARE",
@@ -767,11 +773,23 @@ class Renderer:
                 argv = take_args()
                 while argv and argv[-1] == "":
                     argv.pop()
-                emit(f"{op.text} {', '.join(argv)}".rstrip())
+                text = f"{op.text} {', '.join(argv)}".rstrip()
+                # A keyword left with no arguments keeps a space before a
+                # following colon: "COLOR : PRINT".
+                if not argv and any(x.mnemonic == "COLON"
+                                    for x in line.instrs[line.instrs.index(ins) + 1:]):
+                    text += " "
+                emit(text)
             elif op.arity:
                 emit(f"{op.text} {', '.join(pop(op.arity))}")
             elif op.text:
-                emit(op.text)
+                text = op.text
+                # A bare COLOR keeps a space before a following colon.
+                if mn == "COLOR" and any(
+                        x.mnemonic == "COLON"
+                        for x in line.instrs[line.instrs.index(ins) + 1:]):
+                    text += " "
+                emit(text)
             else:
                 raise RenderError(f"no rendering for {mn}")
 
@@ -780,6 +798,12 @@ class Renderer:
         if printing or using:
             emit(self._print(printing, using, print_keyword, channel))
         if decl_heads and stack:
+            # A declaration is emitted once the whole list has been read, so
+            # a comment on the same line has already been queued. QB writes
+            # the declaration first.
+            tail = None
+            if parts and parts[-1].startswith("'") and comment_at is not None:
+                tail, tail_sep = parts.pop(), seps.pop()
             names = pop(len(stack))
             if declared_type is not None:
                 names[-1] += f" AS {declared_type}"
@@ -792,10 +816,13 @@ class Renderer:
             if len(names) == 1 and pad_col and " AS " in body:
                 # A lone declaration puts its AS clause at a recorded column,
                 # which is how QB lines up the members of a TYPE block.
-                head, _, tail = body.partition(" AS ")
+                head, _, rest = body.partition(" AS ")
                 width = pad_col - line.indent
-                body = head.ljust(max(width, len(head) + 1)) + "AS " + tail
+                body = head.ljust(max(width, len(head) + 1)) + "AS " + rest
             emit(body)
+            if tail is not None:
+                parts.append(tail)
+                seps.append(tail_sep)
         if stack:
             raise RenderError(f"{len(stack)} values left on the stack")
 
@@ -805,7 +832,10 @@ class Renderer:
             prefix = ""
             entry = self.bf.symbol(line.label_ref)
             marker = entry.label if entry else f"{line.label_ref:#06x}"
-            if entry is not None and entry.line_number is None:
+            # A line number takes no colon. Neither does a numeric label too
+            # large to store as one, which QB keeps as a name instead.
+            if (entry is not None and entry.line_number is None
+                    and not marker.isdigit()):
                 marker += ":"
             # The label sits at column 0, and the line's indent is the gap
             # between it and the statement: "30     PRINT I".
@@ -814,8 +844,11 @@ class Renderer:
         text = ""
         for i, part in enumerate(parts):
             if comment_at is not None and i == len(parts) - 1 and part.startswith("'"):
+                gap = 0
                 if comment_colon:
+                    # "DATA &H55        : 'note" keeps a space after the colon.
                     text += ":"
+                    gap = 1
                 # QB puts the comment at its recorded column even when that
                 # leaves no gap: "... OR 128'S?". A label counts towards the
                 # column too.
@@ -823,7 +856,7 @@ class Renderer:
                 # recorded indent rather than the prefix string.
                 base = len(lead) if line.labelled else line.indent
                 width = comment_at - base
-                text = text.ljust(max(width, len(text))) + part
+                text = text.ljust(max(width, len(text) + gap)) + part
             elif i == 0:
                 text = part
             else:

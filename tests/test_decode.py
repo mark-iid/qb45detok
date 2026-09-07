@@ -19,8 +19,8 @@ pytestmark = requires_corpus
 
 #: Sections whose line count matches the trailer. Every section does; this is
 #: here so a regression shows up as a failure rather than a silent slip.
-SECTIONS_IN_SYNC = 251
-TOTAL_SECTIONS = 251
+SECTIONS_IN_SYNC = 253
+TOTAL_SECTIONS = 253
 
 
 @pytest.fixture(scope="module", params=NAMES)
@@ -73,6 +73,10 @@ def test_indentation_matches_the_source(pair):
             continue
         for line, text in zip(ds.lines, src):
             if not text.strip():
+                continue
+            # An untokenized line stores its own leading spaces in the
+            # payload, so the header records no indent for it.
+            if any(i.mnemonic == "TEXT_LINE" for i in line.instrs):
                 continue
             expected = len(text) - len(text.lstrip(" "))
             assert line.indent == expected, f"{ds.section.name}: {text!r}"

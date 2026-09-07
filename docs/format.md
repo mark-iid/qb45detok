@@ -32,7 +32,7 @@ every reference in every corpus file resolves to an entry boundary.
     fc 00 01 00 0c 00 81 01 82 01 06 00 01 02 03 04 05 08  ..  ..  ff ff 24 00
      0                                                     12  13
 
-Bytes `0x00`-`0x11` are byte-identical in all 56 files. `0xfc` at offset 0 is
+Bytes `0x00`-`0x11` are byte-identical in all 57 files. `0xfc` at offset 0 is
 the format magic.
 
 - `0x12`: `0x10` everywhere except `PROJECT2.BAS`, which has `0x11`. Unknown.
@@ -53,7 +53,7 @@ the format magic.
 
 41 `u16` hash buckets at `0x1c`, each holding the reference of the first name
 entry in its chain, or 0 for an empty bucket. Verified: following every
-bucket chain reaches every name-table entry exactly once, in all 56 files.
+bucket chain reaches every name-table entry exactly once, in all 57 files.
 Only buckets 0 to 39 are ever used; slot 40 is empty in every file.
 
 The two kinds of name are hashed into separate halves of the table. Numeric
@@ -81,7 +81,7 @@ other 40 buckets empty, loads and re-saves with the source text unchanged.
 
 - `0x6e`: reference one past the last name entry, i.e. the end of the name
   table. Verified: walking entries from `0x72` lands exactly here.
-- `0x70`: `0x0052` in all 56 files, which is the reference of `0x6e` itself.
+- `0x70`: `0x0052` in all 57 files, which is the reference of `0x6e` itself.
   Probably a fixed "end of buckets" marker.
 
 ## Name table (from `0x72`)
@@ -117,7 +117,7 @@ can produce a 6,855-byte file.
 ## Code sections
 
 The module-level text comes first, at `code_ref + 0x1c`, and is preceded by a
-`u16` byte length. Verified: that length is exact in all 56 files.
+`u16` byte length. Verified: that length is exact in all 57 files.
 
 Every section is followed by a 16-byte trailer:
 
@@ -159,21 +159,21 @@ with its own name:
     ...  tokens
 
 The preamble's kind byte carries at least one meaning: bit `0x80` marks a
-`STATIC` procedure, which holds for all 195 procedures across the corpus. The
+`STATIC` procedure, which holds for all 196 procedures across the corpus. The
 remaining values are `0x30` and `0x38`, differing by bit `0x08`, and every
 `STATIC` procedure has that bit set as well. What it records on its own is not
 known -- it does not track whether the procedure takes parameters, whether it
 is a `FUNCTION` rather than a `SUB`, or whether its header carries `0017`.
 
 Verified: these names match the `SUB`/`FUNCTION` names in the text exactly,
-for all 56 files, and the sections tile the file from the code reference to
+for all 57 files, and the sections tile the file from the code reference to
 EOF with no gaps.
 
 ## Procedure sections in detail
 
 A procedure section starts at the run of comment lines immediately above its
 `SUB`/`FUNCTION` in the source, not at the keyword. Verified: with that
-rule, `line_count` matches the text for every procedure in all 56 files --
+rule, `line_count` matches the text for every procedure in all 57 files --
 including `PROJECT2`'s `MarkTest` and `BondCalc`, which look four lines short
 otherwise.
 
@@ -444,13 +444,13 @@ leaves it on a line that is only whitespace.
 ### Coverage
 
 `src/qb45detok/tokens.py` holds the opcodes identified so far. Against the
-whole corpus that accounts for every one of the 42,288 opcodes, with all 251
+whole corpus that accounts for every one of the 43,292 opcodes, with all 253
 sections decoding to exactly the line count their trailer records and decoded
 indentation matching QB's text output on every procedure line that can be
 checked. `qb45detok stats FILE` reports this per file.
 
-Rendering those tokens back to source reproduces all 56 corpus files byte for
-byte, the largest of them 2,386 lines, and all 12,255 lines overall.
+Rendering those tokens back to source reproduces all 57 corpus files byte for
+byte, the largest of them 2,386 lines, and all 12,708 lines overall.
 
 Cross-checked against the 224 keywords in the QB 4.5 help index, every
 documented statement and function is either an identified opcode or handled by
@@ -550,6 +550,14 @@ Three things would move it further, in order of what they would buy:
   compression). Decoding it would enumerate every documented form mechanically
   instead of leaving the last 33 statement opcodes to be guessed at from what
   sits next to them in the table.
+- **The rest of the reference examples.** Five of the nine batches of
+  programming examples pulled out of the help file round-trip exactly and are
+  in the corpus. The other four still differ on twenty lines between them.
+  Two of those are genuinely undecidable as things stand: `LOCK #2, TO 32`
+  and `LOCK #2, 1 TO 32` produce identical token streams, so the omitted
+  start cannot be recovered. The rest are a name recorded in one letter case
+  and written back in another, and a handful of lines where the extraction
+  pulled prose or DATA values in as code.
 - **More real-world programs.** Three large ones (a NES emulator and both
   modules of an 8086 emulator, 5,342 lines between them) found eleven bugs in
   an afternoon that fifty synthetic samples had not: tab indentation, the
