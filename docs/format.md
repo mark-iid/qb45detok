@@ -636,7 +636,8 @@ bare forms of the statements, which is where the real gaps turned out to be.
 Four things closed the remainder, and they are worth naming because each one
 found something the previous could not:
 
-- **A writer.** Writing the format is a stronger check than reading it,
+- **A writer, and the front half of a tokenizer.** Writing the format is a
+  stronger check than reading it,
   because it has to reproduce every field rather than skip what it does not
   understand. Rebuilding all 57 corpus files byte for byte exposed three
   fields the reader had glossed over: the procedure preamble records `SUB` or
@@ -658,6 +659,13 @@ found something the previous could not:
 
 What would help now, in order:
 
+- **The back half of the tokenizer.** `lex.py`, `expr.py` and `parse.py` turn
+  source into the same reverse-Polish stream the decoder reads back, and get
+  through 98.4% of the corpus, the failures being mostly the prose that sits
+  in untokenized lines. What is missing is the step that resolves names to
+  references and picks the exact opcode for each statement form, which is
+  where `writer.py` takes over. Finishing it gives
+  `tokenize(detokenize(f)) == f`, the strongest test available.
 - **QuickBASIC 4.0 files.** Everything here is 4.5. The claim that 4.0 wrote a
   different variant is repeated from other projects' documentation, not
   tested, which is the one place this document passes on something it has not

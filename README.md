@@ -68,6 +68,14 @@ symbol table, the opcode encodings, and the parts I still cannot explain. If
 you want to write your own reader, or port this to another language, start
 there.
 
+## Reading source back in
+
+`qb45detok.lex`, `.expr` and `.parse` are the front half of a tokenizer: they
+turn BASIC source into the same reverse-Polish stream the decoder reads out of
+a binary. They get through 98.4% of the corpus. What is not written yet is the
+step that resolves names and picks the exact opcode per statement, so this is
+groundwork rather than a finished converter.
+
 ## Reading old data files
 
 Random access files written by these programs hold numbers in Microsoft Binary
