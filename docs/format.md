@@ -1,9 +1,9 @@
 # The QuickBASIC 4.5 binary `.BAS` format
 
-Everything here was derived by comparing `corpus/bin/*` against `corpus/txt/*`,
-which QB 4.5 itself produced. Nothing comes from documentation. Statements
-marked **verified** are checked by `tests/test_reader.py` against all nine
-pairs; the rest are observations that still need confirming.
+Worked out by comparing tokenized programs against the text QB 4.5 produced
+for the same programs. None of it comes from documentation. Anything marked
+Verified is checked by the test suite against every pair in the corpus; the
+rest is observation that still needs confirming.
 
 ## Overall layout
 
@@ -17,47 +17,46 @@ pairs; the rest are observations that still need confirming.
 ## Symbol references
 
 The single most important fact about the format: identifiers do not appear
-inline in the token stream. Everything refers to the name table by a **symbol
-reference**, and a reference is a byte offset measured from `0x1c`, the start
+inline in the token stream. Everything refers to the name table by a symbol
+reference, and a reference is a byte offset measured from `0x1c`, the start
 of the hash-bucket array, not from the start of the file.
 
     file_offset = ref + 0x1c
 
 The same reference space is used by the header, the bucket slots, the chain
-links inside name entries, and the operands in the token stream. **Verified**:
+links inside name entries, and the operands in the token stream. Verified:
 every reference in every corpus file resolves to an entry boundary.
 
-## Header (`0x00`–`0x1b`)
+## Header (`0x00`-`0x1b`)
 
     fc 00 01 00 0c 00 81 01 82 01 06 00 01 02 03 04 05 08  ..  ..  ff ff 24 00
      0                                                     12  13
 
-Bytes `0x00`–`0x11` are byte-identical in all nine files. `0xfc` at offset 0 is
+Bytes `0x00`-`0x11` are byte-identical in all nine files. `0xfc` at offset 0 is
 the format magic.
 
 - `0x12`: `0x10` everywhere except `PROJECT2.BAS`, which has `0x11`. Unknown.
 - `0x13`: `0x51` or `0x10`, and it tracks how the program reached the
   editor rather than what format it was saved in. Every file typed or edited
   in QB and then saved holds `0x51`; every file loaded from ASCII text and
-  saved holds `0x10`. **Verified** by generating a file both ways: both are
+  saved holds `0x10`. Verified by generating a file both ways: both are
   ordinary tokenized programs and both decode identically, so this byte does
-  not mark a failed conversion. It is worth knowing precisely because it
-  looks like it should.
+  not mark a failed conversion, even though it looks like it should.
 - `0x14`-`0x17`: `ff ff 24 00` in every file. Unknown.
-- `0x18`: a `DATA` pointer of some kind. **Verified**: it is `ffff` in every
+- `0x18`: a `DATA` pointer of some kind. Verified: it is `ffff` in every
   program that has no `DATA` statement and non-`ffff` in exactly the two that
   do. Neither value resolves as a name-table reference, so what it points into
   is still unknown.
-- `0x1a`: **code reference**: ref of the first code section. **Verified**.
+- `0x1a`: code reference: ref of the first code section. Verified.
 
-## Symbol table (`0x1c`–`0x71`)
+## Symbol table (`0x1c`-`0x71`)
 
 41 `u16` hash buckets at `0x1c`, each holding the reference of the first name
-entry in its chain, or 0 for an empty bucket. **Verified**: following every
+entry in its chain, or 0 for an empty bucket. Verified: following every
 bucket chain reaches every name-table entry exactly once, in all nine files.
 
 - `0x6e`: reference one past the last name entry, i.e. the end of the name
-  table. **Verified**: walking entries from `0x72` lands exactly here.
+  table. Verified: walking entries from `0x72` lands exactly here.
 - `0x70`: `0x0052` in all nine files, which is the reference of `0x6e` itself.
   Probably a fixed "end of buckets" marker.
 
@@ -90,7 +89,7 @@ can produce a 6,855-byte file.
 ## Code sections
 
 The module-level text comes first, at `code_ref + 0x1c`, and is preceded by a
-`u16` byte length. **Verified**: that length is exact in all nine files.
+`u16` byte length. Verified: that length is exact in all nine files.
 
 Every section is followed by a 16-byte trailer:
 
@@ -102,12 +101,12 @@ Every section is followed by a 16-byte trailer:
 Those first four words are often all `0xff`, which made them look like a
 signature worth scanning for. They are not: in `TORUS` most trailers read
 `ff ff 04 00 ff ff ff ff`, and scanning finds only one of its seventeen
-sections. Sections are found by **chaining declared lengths** instead -- every
+sections. Sections are found by chaining declared lengths instead -- every
 section states how long its token stream is, so the walk is stream, trailer,
-next section, to end of file. **Verified**: this reproduces the previously
+next section, to end of file. Verified: this reproduces the previously
 scanned boundaries exactly and finds all of `TORUS`.
 
-**Verified**: `line_count` equals the number of source lines in the
+Verified: `line_count` equals the number of source lines in the
 corresponding text, counting `SUB`/`FUNCTION` and `END SUB`/`END FUNCTION`
 themselves, for every procedure in every file. This makes a useful oracle for
 the detokenizer: it says exactly how many lines a section must produce.
@@ -119,7 +118,7 @@ carries a `DEFINT`-style statement, QB copies the type defaults to the head of
 every procedure as a hidden record; it occupies a counted line but is never
 printed, so those procedures read one line longer in the binary.
 
-**Verified**: `kind` cleanly separates module text from procedures.
+Verified: `kind` cleanly separates module text from procedures.
 
 Each procedure section follows its predecessor's trailer immediately and starts
 with its own name:
@@ -130,21 +129,21 @@ with its own name:
     ...  name, `length` bytes
     ...  tokens
 
-The preamble's kind byte carries at least one meaning: **bit `0x80` marks a
-`STATIC` procedure**, which holds for all 68 procedures across the corpus. The
+The preamble's kind byte carries at least one meaning: bit `0x80` marks a
+`STATIC` procedure, which holds for all 68 procedures across the corpus. The
 remaining values are `0x30` and `0x38`, differing by bit `0x08`, and every
 `STATIC` procedure has that bit set as well. What it records on its own is not
 known -- it does not track whether the procedure takes parameters, whether it
 is a `FUNCTION` rather than a `SUB`, or whether its header carries `0017`.
 
-**Verified**: these names match the `SUB`/`FUNCTION` names in the text exactly,
+Verified: these names match the `SUB`/`FUNCTION` names in the text exactly,
 for all nine files, and the sections tile the file from the code reference to
 EOF with no gaps.
 
 ## Procedure sections in detail
 
 A procedure section starts at the run of comment lines immediately above its
-`SUB`/`FUNCTION` in the source, not at the keyword. **Verified**: with that
+`SUB`/`FUNCTION` in the source, not at the keyword. Verified: with that
 rule, `line_count` matches the text for every procedure in all nine files --
 including `PROJECT2`'s `MarkTest` and `BondCalc`, which look four lines short
 otherwise.
@@ -157,7 +156,7 @@ preamble described above has to be skipped exactly or every opcode shifts.
 
 ### Lines
 
-The stream is a list of source lines. Each begins with a **header word**:
+The stream is a list of source lines. Each begins with a header word:
 
     bits 15..10   indentation, in spaces
     bits  9.. 0   flags
@@ -177,7 +176,7 @@ Two flag bits are used:
 A header is recognisable because no opcode has zero in its low ten bits apart
 from those flags.
 
-**Verified**: decoded indentation matches the leading spaces of QB's text
+Verified: decoded indentation matches the leading spaces of QB's text
 output on all 2,551 procedure lines that can be checked, with no exceptions.
 That includes lines indented past 32, which only `TORUS` and `PROJECT2`
 contain and which is what exposed the escape in the first place.
@@ -197,17 +196,17 @@ and `File$ = LCASE$(RTRIM$(LTRIM$(COMMAND$)))` is
 
 Three families are encoded rather than enumerated:
 
-- **Variable access.** The high byte is the data type and the low byte the
+- Variable access. The high byte is the data type and the low byte the
   operation. Types: `00` SINGLE, `04` INTEGER, `08` LONG, `0c` DOUBLE, `14`
   STRING. Operations: `0b` load, `0c` store, `0d` declare, `0e` array load,
   `0f` array store, `10` array declare. So `140b` is "load a string variable"
   and takes a symbol reference.
-- **Immediate constants.** Low byte `64`, with the value in the high byte as
+- Immediate constants. Low byte `64`, with the value in the high byte as
   `(high - 1) / 4`: `0164` pushes 0, `0564` pushes 1, `2964` pushes 10.
-- **Type conversions.** Low byte `08`, with the target type in the high byte
+- Type conversions. Low byte `08`, with the target type in the high byte
   under the same `(high - 1) / 4` rule: `0508` is `CINT`, `0908` `CLNG`,
   `0d08` `CSNG`, `1108` `CDBL`.
-- **Literals.** Low byte `65` takes the value in the following word; `016b`
+- Literals. Low byte `65` takes the value in the following word; `016b`
   takes a 32-bit float in the next two and `016c` a 64-bit one in the next
   four; `016d` is a string, a word count followed by that many bytes.
 
@@ -224,18 +223,18 @@ as they are.
 `TYPES.BAS` shows it: its `TYPE` member is called `Name`, which is the QB
 `NAME` statement, so the declaration was rejected -- and with it every later
 line mentioning `Solo.Name`. `REDIM PRESERVE` went the same way; QB 4.5 has no
-`PRESERVE`. **Verified**: every `000a` payload in the corpus appears verbatim
+`PRESERVE`. Verified: every `000a` payload in the corpus appears verbatim
 in QB's text output.
 
 ### Stored source text
 
-Comment text is **run-length encoded**: `0x0d <count> <char>` stands for
+Comment text is run-length encoded: `0x0d <count> <char>` stands for
 `count` copies of `char`, which is how `TORUS` stores its banner comments.
 The comment opcode's payload is a leading word followed by the text, and that
-word is the **column the apostrophe sits at** -- which is what lets QB put an
+word is the column the apostrophe sits at -- which is what lets QB put an
 inline `X = 1    ' note` back where it was.
 
-**Verified**: 458 comments across the corpus expand to exactly the text QB
+Verified: 458 comments across the corpus expand to exactly the text QB
 emitted, and the column matches the position of the quote on 218 of the 220
 lines that can be checked. The two exceptions are `DIM ... AS <type>` lines,
 where the same opcode carries a payload that is not source text at all -- its
@@ -248,10 +247,10 @@ at the right than the line it produced.
 ### Jump targets are filled in by running the program
 
 Control-flow operands -- the target on `IF ... THEN`, `ELSE`, loop ends -- are
-**zero in a file that has been loaded from text and saved without running**.
+zero in a file that has been loaded from text and saved without running.
 QB back-patches them when it compiles.
 
-**Verified**: `samples/EDIT1.BAS` saved after pressing F5 is `TRAIL1` saved
+Verified: `samples/EDIT1.BAS` saved after pressing F5 is `TRAIL1` saved
 without running, and
 the two token streams differ in exactly one word: the `IF`'s target, 0 before
 and 116 after. This matters mostly as a warning -- an unresolved target is not
@@ -267,7 +266,7 @@ words:
     u16  letters A-P, with A at bit 15
 
 Type codes match the ones in a procedure signature: 1 INTEGER, 2 LONG, 3
-SINGLE, 4 DOUBLE, 5 STRING. **Verified**: `DEFTYPE.BAS` declares one range per
+SINGLE, 4 DOUBLE, 5 STRING. Verified: `DEFTYPE.BAS` declares one range per
 type and produces exactly `e000 1c00 0380 0070 000e` with codes 1 to 5, and
 `TORUS`'s `DEFINT A-Z` sets every letter in both masks.
 
@@ -282,10 +281,10 @@ length-prefixed signature:
     then per parameter: u16 reference, u16 0x0200, u16 type
 
 Parameter types are `1` INTEGER, `2` LONG, `3` SINGLE, `4` DOUBLE, `5` STRING.
-**Verified**: `DESCFILE`'s single `DECLARE` unpacks to exactly
+Verified: `DESCFILE`'s single `DECLARE` comes out as
 `IdentifyFile(FileName$, Description$, DescriptionLen%)`.
 
-### Parentheses are recorded, not inferred
+### Parentheses are stored, not worked out from precedence
 
 There is no precedence table to reconstruct. QB stores the parentheses the
 programmer wrote as an explicit opcode (`016e`), redundant ones included, so
@@ -297,7 +296,7 @@ comes back with its `(2)` and its `((200 - 1) + 1)` intact.
 
 ### Parameter lists
 
-A parameter's mode word records how it was *written*, not merely its type:
+A parameter's mode word records how it was written, not its type:
 
 | Bit | Meaning |
 |---|---|
@@ -308,7 +307,7 @@ A parameter's mode word records how it was *written*, not merely its type:
 
 They combine, and the suffix goes inside the parentheses: `Array#()`. A bare
 `0x0000` means the name was written with no suffix at all, taking its type
-from a `DEF<type>`. **Verified**: `MATTMENU`'s 297 declarations round-trip,
+from a `DEF<type>`. Verified: `MATTMENU`'s 297 declarations round-trip,
 including `MeanAverageD (Array#(), First%, ...)` and `FarPeek% (BYVAL DSeg%,
 BYVAL DOfs%)`.
 
@@ -317,7 +316,7 @@ a `SUB` or `FUNCTION` definition omits them.
 
 ### Layout
 
-QB writes the module text first, then the procedures **sorted by name** --
+QB writes the module text first, then the procedures sorted by name --
 not in the order the sections sit in the file. Each section is followed by a
 blank line, unless it already ended with one.
 
@@ -336,13 +335,11 @@ leaves it on a line that is only whitespace.
 ### Coverage
 
 `src/qb45detok/tokens.py` holds the opcodes identified so far. Against the
-whole corpus that accounts for **every one of the 13,527 opcodes**, with **all
-87 sections** decoding to exactly the line count their trailer records and
+whole corpus that accounts for every one of the 13,527 opcodes, with all 87 sections decoding to exactly the line count their trailer records and
 decoded indentation matching QB's text output on all 2,562 procedure lines
 that can be checked. `qb45detok stats FILE` reports this per file.
 
-Rendering those tokens back to source reproduces **18 of the 19 corpus files
-byte for byte**, the largest of them 1,091 lines, and 4,517 of 4,518 lines
+Rendering those tokens back to source reproduces 18 of the 19 corpus files byte for byte, the largest of them 1,091 lines, and 4,517 of 4,518 lines
 overall. The one exception is a single line in `DIRMAST` described below.
 
 ### Known unknowns
@@ -352,15 +349,15 @@ overall. The one exception is a single line in `DIRMAST` described below.
   text. It takes no operands, so it does not affect the walk. Three
   hypotheses are now ruled out by experiment:
 
-  - **Trailing whitespace.** QB strips it on load, and `TRAIL1`/`TRAIL2` came
+  - Trailing whitespace. QB strips it on load, and `TRAIL1`/`TRAIL2` came
     out without `0017` on any line despite carrying all four constructs.
-  - **A compile artefact.** `EDIT1QB.BAS` is the same program after running.
+  - A compile artefact. `EDIT1QB.BAS` is the same program after running.
     It gained a resolved jump target and no `0017`.
-  - **Padding.** It is always the last word on its line, but lines carrying it
+  - Padding. It is always the last word on its line, but lines carrying it
     split across `length mod 4` in the same proportion as lines without it.
-  - **A trailing colon.** Across the whole corpus 117 lines carry `0017`
+  - A trailing colon. Across the whole corpus 117 lines carry `0017`
     without ending in a colon, and exactly one line has both.
-  - **The procedure kind byte.** Bit `0x08` of the preamble kind byte is also
+  - The procedure kind byte. Bit `0x08` of the preamble kind byte is also
     unexplained, but the two are independent: all four combinations of
     "bit set" and "`0017` on the signature line" occur.
 

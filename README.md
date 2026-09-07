@@ -52,7 +52,7 @@ that is a different problem: see [qbasic-reversing-notes].
 ## Why I wrote it
 
 The only way I had to read these files was to boot DOS, load each one into
-`QB.EXE`, and do File → Save As → Text. That is slow, it needs a working DOS
+`QB.EXE`, and do File > Save As > Text. That is slow, it needs a working DOS
 setup, and it has a nasty failure mode: pick the wrong format on the way out
 and you get a file that looks converted and isn't.
 
