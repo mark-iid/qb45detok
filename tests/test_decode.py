@@ -17,9 +17,9 @@ from qb45detok import tokens
 
 pytestmark = requires_corpus
 
-#: Sections whose line count currently matches the trailer. Raise this as more
-#: opcodes are identified; it must never fall.
-SECTIONS_IN_SYNC = 84
+#: Sections whose line count matches the trailer. Every section does; this is
+#: here so a regression shows up as a failure rather than a silent slip.
+SECTIONS_IN_SYNC = 87
 TOTAL_SECTIONS = 87
 
 
