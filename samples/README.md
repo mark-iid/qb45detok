@@ -10,9 +10,9 @@ through QB 4.5 first to make the pair.
 In QB 4.5, for each program:
 
 1. `File -> Open` the `.BAS`.
-2. `File -> Save As`, format **QuickBASIC** — this is the tokenized side, and
+2. `File -> Save As`, format **QuickBASIC**. This is the tokenized side, and
    it should start with byte `0xFC`.
-3. `File -> Save As`, format **Text** — this is the side the tests compare
+3. `File -> Save As`, format **Text**. This is the side the tests compare
    against.
 
 Use QB's own text output, not the file in this directory. QB reformats
@@ -38,7 +38,7 @@ Then put the two in `corpus/bin/NAME.BAS` and `corpus/txt/NAME.BAS`.
 | `EDIT1.BAS` | same program as `TRAIL1`, for saving after a run |
 
 `TYPES.BAS` is deliberately kept as it is. Its `TYPE` member is called `Name`,
-which QB reads as the `NAME` statement, so the declaration is rejected — and
+which QB reads as the `NAME` statement, so the declaration is rejected, and
 `REDIM PRESERVE` does not exist in 4.5 either. QB stores both lines as raw
 source text rather than tokenizing them, which is the only example I have of
 that happening. `TYPES2.BAS` is the corrected version.

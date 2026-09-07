@@ -18,8 +18,8 @@ pairs; the rest are observations that still need confirming.
 
 The single most important fact about the format: identifiers do not appear
 inline in the token stream. Everything refers to the name table by a **symbol
-reference**, and a reference is a byte offset measured from `0x1c` — the start
-of the hash-bucket array — not from the start of the file.
+reference**, and a reference is a byte offset measured from `0x1c`, the start
+of the hash-bucket array, not from the start of the file.
 
     file_offset = ref + 0x1c
 
@@ -35,20 +35,20 @@ every reference in every corpus file resolves to an entry boundary.
 Bytes `0x00`–`0x11` are byte-identical in all nine files. `0xfc` at offset 0 is
 the format magic.
 
-- `0x12` — `0x10` everywhere except `PROJECT2.BAS`, which has `0x11`. Unknown.
-- `0x13` — `0x51` or `0x10`, and it tracks how the program reached the
+- `0x12`: `0x10` everywhere except `PROJECT2.BAS`, which has `0x11`. Unknown.
+- `0x13`: `0x51` or `0x10`, and it tracks how the program reached the
   editor rather than what format it was saved in. Every file typed or edited
   in QB and then saved holds `0x51`; every file loaded from ASCII text and
   saved holds `0x10`. **Verified** by generating a file both ways: both are
   ordinary tokenized programs and both decode identically, so this byte does
   not mark a failed conversion. It is worth knowing precisely because it
   looks like it should.
-- `0x14`–`0x17` — `ff ff 24 00` in every file. Unknown.
-- `0x18` — a `DATA` pointer of some kind. **Verified**: it is `ffff` in every
+- `0x14`-`0x17`: `ff ff 24 00` in every file. Unknown.
+- `0x18`: a `DATA` pointer of some kind. **Verified**: it is `ffff` in every
   program that has no `DATA` statement and non-`ffff` in exactly the two that
   do. Neither value resolves as a name-table reference, so what it points into
   is still unknown.
-- `0x1a` — **code reference**: ref of the first code section. **Verified**.
+- `0x1a`: **code reference**: ref of the first code section. **Verified**.
 
 ## Symbol table (`0x1c`–`0x71`)
 
@@ -56,9 +56,9 @@ the format magic.
 entry in its chain, or 0 for an empty bucket. **Verified**: following every
 bucket chain reaches every name-table entry exactly once, in all nine files.
 
-- `0x6e` — reference one past the last name entry, i.e. the end of the name
+- `0x6e`: reference one past the last name entry, i.e. the end of the name
   table. **Verified**: walking entries from `0x72` lands exactly here.
-- `0x70` — `0x0052` in all nine files, which is the reference of `0x6e` itself.
+- `0x70`: `0x0052` in all nine files, which is the reference of `0x6e` itself.
   Probably a fixed "end of buckets" marker.
 
 ## Name table (from `0x72`)
@@ -76,13 +76,13 @@ For `flags` `0x00` and `0x40` the payload is the identifier as ASCII.
 |---|---|
 | `0x00` | plain name (variable, label, external) |
 | `0x40` | procedure |
-| `0x02`, `0x04`, `0x06` | not a name — a 2-byte binary payload, unknown. Only in `DIRMAST`, `DRAWSCR1`, `PROJECT2`, `STARDEF`, the files with line numbers, `TYPE` and `DATA` |
+| `0x02`, `0x04`, `0x06` | not a name, a 2-byte binary payload, unknown. Only in `DIRMAST`, `DRAWSCR1`, `PROJECT2`, `STARDEF`, the files with line numbers, `TYPE` and `DATA` |
 
 `0x40` is *about* procedures but is not simply "has a `DECLARE`": in `DIRMAST`
 13 declared procedures lack it and in `STARDEF` three flagged names have no
 `DECLARE`. The exact rule is not yet known.
 
-The table also holds names that appear nowhere in the source — `OBJSCAN` has
+The table also holds names that appear nowhere in the source. `OBJSCAN` has
 `dir`, `Rotinue`, `Rotine` and `NMALLOC` for a 28-line program. QB evidently
 does not garbage-collect names once entered, which is why a 284-byte program
 can produce a 6,855-byte file.

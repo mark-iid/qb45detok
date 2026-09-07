@@ -12,7 +12,7 @@ qb45detok detok OLDPROG.BAS -o OLDPROG.TXT
 
 QuickBASIC could save a program either as plain text or in its own tokenized
 binary format. The binary format is smaller and loads faster, so a lot of code
-from the era ended up stored that way — including a pile of my own from 1994.
+from the era ended up stored that way, including a pile of my own from 1994.
 
 ## Is this the right tool for your file?
 
@@ -32,11 +32,11 @@ head -c 1 OLDPROG.BAS | od -An -tx1
 
 Only the `fc` row is something I have verified myself, across nineteen files.
 The rest is from those projects' own documentation, and is here so you do not
-waste time on the wrong tool — as I did.
+waste time on the wrong tool, as I did.
 
 A note on versions. I have only tested this against QuickBASIC 4.5. QuickBASIC
 4.0 and the later PDS / BASIC 7.x releases wrote their own variants, and QBasic
-1.1 — the cut-down one bundled with MS-DOS 5 and 6 — saves plain text only, so
+1.1, the cut-down one bundled with MS-DOS 5 and 6, saves plain text only, so
 its files need nothing. If you have a `0xFC` file from something other than 4.5
 and it does not decode, that is worth reporting.
 
@@ -63,7 +63,7 @@ rather than storing names inline, and statements are stored in reverse Polish
 rather than as a flat token list.
 
 So I worked the format out by saving programs both ways and comparing the two
-sides. `docs/format.md` is what I found, written up properly — the layout, the
+sides. `docs/format.md` is what I found, written up properly: the layout, the
 symbol table, the opcode encodings, and the parts I still cannot explain. If
 you want to write your own reader, or port this to another language, start
 there.
@@ -95,8 +95,8 @@ qb45detok stats PROGRAM.BAS        # how much of the token stream is identified
 
 ## How well it works
 
-Across the nineteen programs I tested it on — my own code, a QuickBASIC sample,
-and some small programs written to exercise one feature each — **eighteen come
+Across the nineteen programs I tested it on (my own code, a QuickBASIC sample,
+and some small programs written to exercise one feature each) **eighteen come
 back byte for byte identical** to what QuickBASIC itself writes with Save As
 Text. The largest of those is 1,091 lines. The nineteenth differs by a single
 character on one line.
@@ -133,8 +133,8 @@ run the full suite, put pairs in `corpus/bin/NAME.BAS` and `corpus/txt/NAME.BAS`
 and the tests will pick them up.
 
 `samples/` has small programs written to exercise one language feature each,
-in plain text. Run each through QB 4.5 and save it twice — once in QuickBASIC
-format, once as text — and you have a corpus to test against without needing
+in plain text. Run each through QB 4.5 and save it twice, once in QuickBASIC
+format and once as text, and you have a corpus to test against without needing
 mine. `samples/README.md` has the steps.
 
 ```
