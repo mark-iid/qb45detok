@@ -555,12 +555,15 @@ them like the neighbouring variant of the same statement.
   `0001`, `0004` and `0005` are line headers the decoder has to read as such,
   and `0002` makes QB loop when it is handed one, so the rest of that range is
   almost certainly the same kind of thing.
-- 15 statement opcodes are still unassigned: `13 14 24 25 30 34 35 36 7b 7c 8b
-  8c 8d 8e 99`. `7b` is known to produce no display text, the way `004b` and
-  `0098` do. `8b`-`8e` sit among the I/O markers rather than in either
+- 13 statement opcodes are still unassigned: `13 14 24 25 30 34 35 36 8b 8c 8d
+  8e 99`. `8b`-`8e` sit among the I/O markers rather than in either
   alphabetical block, and `13`, `14`, `24`, `25`, `30` and `34`-`36` sit in the
   low region that has no alphabetical order to read them by. Handing each to QB
   one at a time, as described above, is the way to finish them.
+- Five opcodes are identified but produce no display text: `004b`, `0075`'s
+  companion `0098`, `007b`, `007c`, and `0017`, which is the dotted name
+  marker described earlier. Whatever the first four record, QB writes nothing
+  for them, so ignoring them costs nothing.
   The four unassigned function codes are `0108 014c 017e 017f`. They sit in the
   alphabet between `ATN` and `CHR$`, between `SGN` and `SIN`, and after `DIM`.
 

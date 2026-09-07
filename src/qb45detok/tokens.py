@@ -308,6 +308,9 @@ _OPS = [
     _op(0x0084, "COORD_TO_STEP", (), 2, "-STEP", "stmt"),
     _op(0x0085, "FIELD_STMT", (), None, "FIELD", "stmt"),
     _op(0x0086, "FIELD_ITEM", (), 2, None, "stmt"),
+    # Both produce no display text, the way 004b and 0098 do.
+    _op(0x007B, "MARK_7B", (), 0, None, "stmt"),
+    _op(0x007C, "MARK_7C", (), 0, None, "stmt"),
     _op(0x007D, "PRINT_FILE", (), None, "PRINT #", "stmt"),
     _op(0x0087, "INPUT_CHANNEL", (), None, "LINE INPUT #", "stmt"),
     _op(0x0088, "INPUT", (), None, "INPUT", "stmt"),
