@@ -291,6 +291,12 @@ _OPS = [
     _op(0x001E, "SHARED_TYPED", ("u16",), 0, "SHARED", "stmt"),
     _op(0x001F, "STATIC", ("u16",), 0, "STATIC", "stmt"),
     _op(0x0020, "TYPE", ("u16", "ref"), 0, "TYPE", "stmt"),
+    # Produces no display text, the way 004b and 0098 do.
+    _op(0x0024, "MARK_24", (), 0, None, "stmt"),
+    # QB writes "BYVAL" for this when handed one on its own. It marks an
+    # argument passed by value in a call; no corpus file uses one, so
+    # where exactly it sits in an argument list is not established.
+    _op(0x0025, "BYVAL_ARG", (), 0, "BYVAL", "stmt"),
     _op(0x0026, "DEF_FN_END_LINE", ("u16", "u16"), 0, None, "stmt"),
     _op(0x001C, "REDIM", (), 0, "REDIM", "stmt"),
     _op(0x017B, "SLEEP", (), 1, "SLEEP", "stmt"),
