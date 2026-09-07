@@ -133,7 +133,7 @@ class Renderer:
         self.bf = bf
         self.section_kind: Optional[int] = None
         self.section_is_function = False
-        self.in_def_fn = False  # inside a multi-line DEF FN, where EXIT is "EXIT DEF"
+        self.in_module = True   # module text: EXIT there means EXIT DEF
 
     # -- names -----------------------------------------------------------
 
@@ -178,10 +178,9 @@ class Renderer:
         # array subscripts inside a declaration are bounds, written "lo TO hi".
         declaring_line = any(i.mnemonic in self.DECLARATION_HEADS
                              for i in line.instrs)
-        if any(i.mnemonic == "END_DEF" for i in line.instrs):
-            self.in_def_fn = False
         pending: Optional[str] = None  # a keyword prefixing the next statement
         comment_at: Optional[int] = None
+        comment_colon = False  # a colon sits between the code and the comment
 
         def pop(n: int = 1) -> List[str]:
             if len(stack) < n:
@@ -227,13 +226,13 @@ class Renderer:
             elif mn == "PUSH_HEX":
                 stack.append("&H%X" % ins.operands[0])
             elif mn == "PUSH_HEX_LONG":
-                stack.append("&H%X" % (ins.operands[0] | (ins.operands[1] << 16)))
+                stack.append(self._long_literal("&H%X", ins.operands))
             elif mn == "PUSH_OCT":
                 stack.append("&O%o" % ins.operands[0])
             elif mn == "PUSH_OCT_LONG":
-                stack.append("&O%o" % (ins.operands[0] | (ins.operands[1] << 16)))
+                stack.append(self._long_literal("&O%o", ins.operands))
             elif mn == "PUSH_LONG":
-                stack.append(str(ins.operands[0] | (ins.operands[1] << 16)))
+                stack.append(self._long_literal("%d", ins.operands))
             elif mn == "PUSH_SINGLE":
                 stack.append(format_single(ins.operands))
             elif mn == "PUSH_DOUBLE":
@@ -256,7 +255,14 @@ class Renderer:
                 # anything already on the stack belongs to an earlier name.
                 dims = self._bounds(stack, ins.operands[0], dim_marks,
                                     declared_so_far)
-                stack.append(self._value(ins, pop, bounds=dims, declaring=True))
+                text = self._value(ins, pop, bounds=dims, declaring=True)
+                if declared_type is not None:
+                    # REDIM writes an AS clause per name, same as DIM.
+                    text += f" AS {declared_type}"
+                    if pad_col is None:
+                        pad_col = declared_col
+                    declared_type = declared_col = None
+                stack.append(text)
                 declared_so_far = len(stack)
             elif op.form == "var" and mn.startswith(("LOAD", "ARRAY")):
                 stack.append(self._value(ins, pop))
@@ -328,8 +334,13 @@ class Renderer:
                 # A colon with nothing after it is written out. The dotted
                 # name marker can sit past it, so look through it.
                 rest = line.instrs[line.instrs.index(ins) + 1:]
-                if all(x.mnemonic == "DOTTED_NAME" for x in rest):
+                kept = [x for x in rest if x.mnemonic != "DOTTED_NAME"]
+                if not kept:
                     trailing_colon = True
+                elif all(x.mnemonic == "REM" for x in kept):
+                    # "CASE 0: 'comment" keeps its colon, and the comment
+                    # still goes at its recorded column.
+                    comment_colon = True
             elif mn == "DIM_ARRAY":
                 # Marks the dimension about to be pushed as having only an
                 # upper bound. The rest were written "lo TO hi".
@@ -340,19 +351,23 @@ class Renderer:
             elif mn in self.DECLARATION_HEADS and mn != "TYPE_MEMBER":
                 # "DIM SHARED" arrives as SHARED then DIM, so the keywords
                 # read back in reverse.
-                decl_heads.insert(0, self.DECLARATION_HEADS[mn])
+                head = self.DECLARATION_HEADS[mn]
+                # REDIM repeats once per name declared; the keyword is written
+                # only once.
+                if head not in decl_heads:
+                    decl_heads.insert(0, head)
                 # COMMON's second operand names its block, 0xffff when it has
                 # none. The name follows every keyword: "COMMON SHARED /B/ C".
                 if mn == "COMMON" and len(ins.operands) > 1 and ins.operands[1] != 0xFFFF:
                     common_block = self.name(ins.operands[1])
             elif mn == "REM_META":
-                # The only form in the corpus; the text is not stored.
-                emit("REM $DYNAMIC" if ins.operands[:1] == [1] else "REM")
+                # A comment written with the REM keyword rather than "'".
+                emit("REM" + (ins.text or ""))
+            elif mn == "META_DYNAMIC":
+                # Supplies the metacommand text for the comment before it.
+                if parts:
+                    parts[-1] += op.text
             elif mn == "DEF_FN":
-                # A one-line DEF FN assigns on the same line; only the block
-                # form opens a body where EXIT means EXIT DEF.
-                self.in_def_fn = not any(x.mnemonic.startswith("STORE")
-                                         for x in line.instrs)
                 emit("DEF " + self._def_fn(ins))
             elif mn == "DEF_FN_END_LINE":
                 (value,) = pop()
@@ -450,7 +465,8 @@ class Renderer:
             elif mn == "CLOSE":
                 argv = pop(len(stack))
                 emit(f"CLOSE {', '.join(argv)}".rstrip())
-            elif mn == "LINE_INPUT_FILE":
+            elif mn == "INPUT_CHANNEL":
+                # Sets the file channel for both INPUT # and LINE INPUT #.
                 (channel,) = pop()
             elif mn == "INPUT_VARS_END":
                 argv = pop(len(stack))
@@ -472,15 +488,19 @@ class Renderer:
                 pass
             elif mn == "INPUT":
                 argv = pop(len(stack))
-                lead = "; " if input_flags & 0x02 else ""
-                if input_flags & 0x04:
-                    sep = ", " if input_flags & 0x01 else "; "
-                    head = f"INPUT {lead}{input_prompt}{sep}"
+                if channel:
+                    head = f"INPUT {channel}, "
                 else:
-                    head = f"INPUT {lead}"
+                    lead = "; " if input_flags & 0x02 else ""
+                    if input_flags & 0x04:
+                        sep = ", " if input_flags & 0x01 else "; "
+                        head = f"INPUT {lead}{input_prompt}{sep}"
+                    else:
+                        head = f"INPUT {lead}"
                 emit(head + ", ".join(argv))
                 input_prompt = None
                 input_flags = 0
+                channel = None
 
             # -- PRINT ----------------------------------------------------
             elif mn in ("PRINT_FUNC_SEMI", "PRINT_FUNC_COMMA"):
@@ -510,7 +530,12 @@ class Renderer:
             # -- control flow ---------------------------------------------
             elif mn in ("IF_THEN_BLOCK", "ELSEIF"):
                 (cond,) = pop()
-                emit(f"{op.text} {cond} THEN")
+                # An ELSEIF with its body on the same line takes a space
+                # rather than the usual colon separator.
+                rest = line.instrs[line.instrs.index(ins) + 1:]
+                inline = mn == "ELSEIF" and any(
+                    x.mnemonic not in ("DOTTED_NAME", "REM") for x in rest)
+                emit(f"{op.text} {cond} THEN", sep=" " if inline else None)
             elif mn == "IF_THEN_LINE":
                 (cond,) = pop()
                 emit(f"IF {cond} THEN", sep=" ")
@@ -581,7 +606,9 @@ class Renderer:
             elif mn == "END_SUB":
                 emit("END FUNCTION" if self.section_is_function else "END SUB")
             elif mn == "EXIT_SUB":
-                if self.in_def_fn:
+                # In the module text the only thing there is to exit is a
+                # DEF FN, and QB writes it that way whatever the source said.
+                if self.in_module:
                     emit("EXIT DEF")
                 else:
                     emit("EXIT FUNCTION" if self.section_is_function else "EXIT SUB")
@@ -679,13 +706,17 @@ class Renderer:
             if i == 0:
                 text = part
             elif comment_at is not None and i == len(parts) - 1 and part.startswith("'"):
-                text = text.ljust(max(comment_at - line.indent, len(text) + 1)) + part
+                if comment_colon:
+                    text += ":"
+                # QB puts the comment at its recorded column even when that
+                # leaves no gap: "... OR 128'S?".
+                text = text.ljust(max(comment_at - line.indent, len(text))) + part
             else:
                 text += seps[i - 1] + part
 
         if trailing_colon:
             text += ":"
-        prefix = " " * line.indent
+        prefix = self._indent(line.indent)
         if line.labelled:
             entry = self.bf.symbol(line.label_ref)
             marker = entry.label if entry else f"{line.label_ref:#06x}"
@@ -703,7 +734,6 @@ class Renderer:
     # -- helpers ---------------------------------------------------------
 
     @staticmethod
-    @staticmethod
     def _merge_coords(argv: List[str]) -> List[str]:
         """``-(x, y)`` belongs to the coordinate before it, not after a comma."""
         out: List[str] = []
@@ -713,6 +743,31 @@ class Renderer:
             else:
                 out.append(item)
         return out
+
+    def _indent(self, width: int) -> str:
+        """A line's leading whitespace.
+
+        A program QB has flagged as tab-indented gets one tab per eight
+        columns and spaces for the remainder; everything else gets spaces.
+        """
+        if self.bf.uses_tabs:
+            return "\t" * (width // 8) + " " * (width % 8)
+        return " " * width
+
+    def _long_literal(self, fmt: str, words) -> str:
+        """A long hex or octal literal.
+
+        QB writes the trailing "&" only when it is needed. A value that does
+        not fit in 16 bits is already unambiguously long, so "&HFFFFF" needs
+        no suffix while "&HFFFF&" does.
+        """
+        value = words[0] | (words[1] << 16)
+        text = fmt % value
+        # QB writes the suffix only where the literal would otherwise read as
+        # an integer. Decimal integers are signed, so 65535 is already long,
+        # while &HFFFF is a valid 16-bit pattern and does need the "&".
+        fits = -32768 <= value <= 32767 if fmt == "%d" else value <= 0xFFFF
+        return text + "&" if fits else text
 
     @staticmethod
     def _print(items: List[str], using: Optional[str] = None,
@@ -889,7 +944,8 @@ class Renderer:
         try:
             return self.line(line)
         except (RenderError, ValueError, IndexError, KeyError) as exc:
-            return f"{' ' * line.indent}' <qb45detok: {type(exc).__name__}: {exc}>"
+            return (self._indent(line.indent)
+                    + f"' <qb45detok: {type(exc).__name__}: {exc}>")
 
     def file(self, sections: List[DecodedSection]) -> List[str]:
         """Every section in the order QB writes them out.
@@ -905,13 +961,13 @@ class Renderer:
         # QB writes a DEF<type> line whenever the default type changes from
         # one section to the next. A procedure with no DEFtype record of its
         # own is back to the language default, which is single precision.
-        current_type = self._deftype_of(modules[0]) if modules else None
+        default = [self.DEFAULT_TYPE] * 26
+        current = (self._deftype_state(modules[0]) if modules else None)
         for ds in modules + procs:
-            if not ds.section.is_module:
-                wanted = self._deftype_of(ds) or "DEFSNG A-Z"
-                if current_type is not None and wanted != current_type:
-                    out.append(wanted)
-                    current_type = wanted
+            if not ds.section.is_module and current is not None:
+                wanted = self._deftype_state(ds) or list(default)
+                out.extend(self._deftype_delta(current, wanted))
+                current = wanted
             body = self.section(ds)
             if ds.section.is_module and procs and self._uses_dynamic(ds):
                 # A module that turned on $DYNAMIC gets a matching $STATIC
@@ -929,13 +985,40 @@ class Renderer:
                 out.append("")
         return out
 
-    def _deftype_of(self, ds: DecodedSection) -> Optional[str]:
-        """The DEF<type> a section declares, as source, or None."""
+    #: The type a letter has when no DEF<type> covers it.
+    DEFAULT_TYPE = 3  # single precision
+
+    def _deftype_state(self, ds: DecodedSection) -> Optional[List[int]]:
+        """The default type of each letter A-Z, from a section's record.
+
+        The record names one type and the letters that have it; every other
+        letter is back to the language default.
+        """
         for line in ds.lines:
             for ins in line.instrs:
                 if ins.mnemonic == "DEFTYPE":
-                    return self._deftype(ins)
+                    _, tail, head = ins.operands
+                    code = tail & 0x3F
+                    named = {i for i in range(16) if head >> (15 - i) & 1}
+                    named |= {16 + i for i in range(10) if tail >> (15 - i) & 1}
+                    return [code if i in named else self.DEFAULT_TYPE
+                            for i in range(26)]
         return None
+
+    def _deftype_delta(self, before: List[int], after: List[int]) -> List[str]:
+        """The DEF<type> lines QB writes to move from one state to the other.
+
+        It writes the change, not the new state: going from ``DEFINT A-Z`` to
+        a section where only C and R are integers gives
+        ``DEFSNG A-B, D-Q, S-Z`` rather than ``DEFINT C, R``.
+        """
+        out = []
+        changed = [i for i in range(26) if before[i] != after[i]]
+        for code in sorted({after[i] for i in changed}):
+            letters = [i for i in changed if after[i] == code]
+            keyword = self.DEFTYPE_KEYWORDS.get(code, "DEFSNG")
+            out.append(f"{keyword} {self._ranges(letters)}")
+        return out
 
     @staticmethod
     def _uses_dynamic(ds: DecodedSection) -> bool:
@@ -943,7 +1026,7 @@ class Renderer:
 
     def section(self, ds: DecodedSection) -> List[str]:
         self.section_kind = ds.section.kind_byte
-        self.in_def_fn = False
+        self.in_module = ds.section.is_module
         self.section_is_function = any(
             i.mnemonic == "FUNCTION" for line in ds.lines for i in line.instrs
         )

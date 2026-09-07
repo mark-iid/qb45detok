@@ -31,7 +31,13 @@ HEADER_TEMPLATE = bytes.fromhex(
 #: The word at 0x70 is the reference of 0x6e itself and never varies.
 SELF_REF = 0x52
 
-#: Trailer kinds.
+#: QB leaves a fixed run of free space between the end of the name table and
+#: the first code section, presumably so the table can grow without moving the
+#: code. It is 259 bytes in all 49 corpus files and zero-filled in 48 of them.
+NAME_SLACK = 259
+
+#: Trailer kinds. The module is always 0x0102; procedures are usually 0x0c02
+#: but 0x0802 and 0x0402 both occur, so the caller can override it.
 KIND_MODULE = 0x0102
 KIND_PROC = 0x0C02
 
@@ -47,6 +53,7 @@ class OutName:
     text: Optional[str] = None       #: for the text flags
     number: Optional[int] = None     #: for the numeric-label flags
     ref: int = 0                     #: filled in by the writer
+    bucket: int = 0                  #: which hash chain to put it in
 
     @property
     def payload(self) -> bytes:
@@ -67,6 +74,9 @@ class OutSection:
     line_count: int
     name: Optional[str] = None       #: None for the module text
     kind_byte: int = DEFAULT_PROC_KIND
+    proc_kind: int = 1               #: 1 for a SUB, 2 for a FUNCTION
+    return_type: int = 0             #: a FUNCTION's return type, else 0
+    trailer_kind: Optional[int] = None
     head: Sequence[int] = (0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF)
     unknown_c: int = 0
 
@@ -80,9 +90,11 @@ class OutSection:
         else:
             raw = self.name.encode("latin-1")
             out = (bytes([0x00, len(raw), 0x00]) + raw
-                   + bytes([0x01, 0x00, self.kind_byte])
+                   + bytes([self.proc_kind, self.return_type, self.kind_byte])
                    + struct.pack("<H", len(self.body)) + self.body)
         kind = KIND_MODULE if self.is_module else KIND_PROC
+        if self.trailer_kind is not None:
+            kind = self.trailer_kind
         return out + struct.pack("<HHHHIHH", *self.head, self.line_count,
                                  self.unknown_c, kind)
 
@@ -94,31 +106,57 @@ class ImageWriter:
         self.names: List[OutName] = []
         self.sections: List[OutSection] = []
         self._by_key: Dict[tuple, OutName] = {}
+        #: Bytes 0x00-0x1b. Callers may patch the offsets whose meaning is not
+        #: known (0x12, 0x14, 0x15, 0x18, 0x19) and the editor-provenance byte
+        #: at 0x13; the writer fills in the code reference at 0x1a.
+        self.header = bytearray(HEADER_TEMPLATE)
+        #: The free space between the name table and the first section. Zero
+        #: fill matches 48 of the 49 corpus files.
+        self.slack = bytes(NAME_SLACK)
 
     # -- names -----------------------------------------------------------
 
     def add_name(self, flags: int, text: Optional[str] = None,
-                 number: Optional[int] = None) -> OutName:
-        """Intern a name-table entry, returning the existing one if present."""
+                 number: Optional[int] = None, bucket: Optional[int] = None) -> OutName:
+        """Intern a name-table entry, returning the existing one if present.
+
+        ``bucket`` picks the hash chain. Leaving it out puts everything in
+        chain 0, which QB accepts; pass one only when reproducing a file whose
+        original placement is known.
+        """
         key = (flags, text, number)
         found = self._by_key.get(key)
         if found is None:
-            found = OutName(flags=flags, text=text, number=number)
+            found = OutName(flags=flags, text=text, number=number,
+                            bucket=0 if bucket is None else bucket)
             self._by_key[key] = found
             self.names.append(found)
         return found
 
     def _layout_names(self) -> bytes:
-        """Assign a reference to every entry and chain them into bucket 0."""
+        """Assign a reference to every entry and chain each into its bucket.
+
+        Entries are written in the order they were added; the chains thread
+        through that layout rather than reordering it.
+        """
         ref = NAMES_OFF - REF_BASE
         for entry in self.names:
             entry.ref = ref
             ref += 4 + len(entry.payload)
         self.free_ref = ref
+        self.heads = [0] * BUCKET_COUNT
+        nxt_of: Dict[int, int] = {}
+        prev: Dict[int, OutName] = {}
+        for entry in self.names:
+            b = entry.bucket
+            if b in prev:
+                nxt_of[id(prev[b])] = entry.ref
+            else:
+                self.heads[b] = entry.ref
+            prev[b] = entry
         out = bytearray()
-        for i, entry in enumerate(self.names):
-            nxt = self.names[i + 1].ref if i + 1 < len(self.names) else 0
-            out += entry.encoded(nxt)
+        for entry in self.names:
+            out += entry.encoded(nxt_of.get(id(entry), 0))
         return bytes(out)
 
     # -- the whole file --------------------------------------------------
@@ -126,18 +164,19 @@ class ImageWriter:
     def build(self) -> bytes:
         names = self._layout_names()
         buckets = bytearray(BUCKET_COUNT * 2)
-        if self.names:
-            buckets[0:2] = struct.pack("<H", self.names[0].ref)
+        for i, head in enumerate(self.heads):
+            buckets[2 * i:2 * i + 2] = struct.pack("<H", head)
         body = bytearray()
         for section in self.sections:
             body += section.encoded()
-        code_ref = NAMES_OFF + len(names) - REF_BASE
+        code_ref = NAMES_OFF + len(names) + len(self.slack) - REF_BASE
 
-        out = bytearray(HEADER_TEMPLATE)
+        out = bytearray(self.header)
         out[CODE_REF_OFF:CODE_REF_OFF + 2] = struct.pack("<H", code_ref)
         out += buckets
         out[FREE_REF_OFF:FREE_REF_OFF + 2] = struct.pack("<H", self.free_ref)
         out[FREE_REF_OFF + 2:FREE_REF_OFF + 4] = struct.pack("<H", SELF_REF)
         out += names
+        out += self.slack
         out += body
         return bytes(out)

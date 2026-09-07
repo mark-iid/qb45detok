@@ -32,7 +32,7 @@ every reference in every corpus file resolves to an entry boundary.
     fc 00 01 00 0c 00 81 01 82 01 06 00 01 02 03 04 05 08  ..  ..  ff ff 24 00
      0                                                     12  13
 
-Bytes `0x00`-`0x11` are byte-identical in all 49 files. `0xfc` at offset 0 is
+Bytes `0x00`-`0x11` are byte-identical in all 52 files. `0xfc` at offset 0 is
 the format magic.
 
 - `0x12`: `0x10` everywhere except `PROJECT2.BAS`, which has `0x11`. Unknown.
@@ -53,7 +53,7 @@ the format magic.
 
 41 `u16` hash buckets at `0x1c`, each holding the reference of the first name
 entry in its chain, or 0 for an empty bucket. Verified: following every
-bucket chain reaches every name-table entry exactly once, in all 49 files.
+bucket chain reaches every name-table entry exactly once, in all 52 files.
 Only buckets 0 to 39 are ever used; slot 40 is empty in every file.
 
 The two kinds of name are hashed into separate halves of the table. Numeric
@@ -81,7 +81,7 @@ other 40 buckets empty, loads and re-saves with the source text unchanged.
 
 - `0x6e`: reference one past the last name entry, i.e. the end of the name
   table. Verified: walking entries from `0x72` lands exactly here.
-- `0x70`: `0x0052` in all 49 files, which is the reference of `0x6e` itself.
+- `0x70`: `0x0052` in all 52 files, which is the reference of `0x6e` itself.
   Probably a fixed "end of buckets" marker.
 
 ## Name table (from `0x72`)
@@ -117,7 +117,7 @@ can produce a 6,855-byte file.
 ## Code sections
 
 The module-level text comes first, at `code_ref + 0x1c`, and is preceded by a
-`u16` byte length. Verified: that length is exact in all 49 files.
+`u16` byte length. Verified: that length is exact in all 52 files.
 
 Every section is followed by a 16-byte trailer:
 
@@ -159,21 +159,21 @@ with its own name:
     ...  tokens
 
 The preamble's kind byte carries at least one meaning: bit `0x80` marks a
-`STATIC` procedure, which holds for all 73 procedures across the corpus. The
+`STATIC` procedure, which holds for all 194 procedures across the corpus. The
 remaining values are `0x30` and `0x38`, differing by bit `0x08`, and every
 `STATIC` procedure has that bit set as well. What it records on its own is not
 known -- it does not track whether the procedure takes parameters, whether it
 is a `FUNCTION` rather than a `SUB`, or whether its header carries `0017`.
 
 Verified: these names match the `SUB`/`FUNCTION` names in the text exactly,
-for all 49 files, and the sections tile the file from the code reference to
+for all 52 files, and the sections tile the file from the code reference to
 EOF with no gaps.
 
 ## Procedure sections in detail
 
 A procedure section starts at the run of comment lines immediately above its
 `SUB`/`FUNCTION` in the source, not at the keyword. Verified: with that
-rule, `line_count` matches the text for every procedure in all 49 files --
+rule, `line_count` matches the text for every procedure in all 52 files --
 including `PROJECT2`'s `MarkTest` and `BondCalc`, which look four lines short
 otherwise.
 
@@ -241,6 +241,15 @@ Three families are encoded rather than enumerated:
 
 Length-prefixed payloads are padded to a word boundary. String literals are
 padded with the closing `"` rather than a zero.
+
+### Untokenized procedures
+
+A module that belongs to a multi-module project carries the other module's
+procedures as raw source text rather than as code sections of its own.
+`QB8086.BAS`, one half of a two-module program, has 30 real procedure sections
+and 52 more written out as untokenized lines, which is why its text defines 82
+procedures. They round-trip exactly, because untokenized lines are stored
+verbatim.
 
 ### The dotted name marker
 
@@ -435,13 +444,13 @@ leaves it on a line that is only whitespace.
 ### Coverage
 
 `src/qb45detok/tokens.py` holds the opcodes identified so far. Against the
-whole corpus that accounts for every one of the 15,174 opcodes, with all 123
+whole corpus that accounts for every one of the 38,471 opcodes, with all 246
 sections decoding to exactly the line count their trailer records and decoded
 indentation matching QB's text output on every procedure line that can be
 checked. `qb45detok stats FILE` reports this per file.
 
-Rendering those tokens back to source reproduces all 49 corpus files byte for
-byte, the largest of them 1,091 lines, and all 5,148 lines overall.
+Rendering those tokens back to source reproduces all 52 corpus files byte for
+byte, the largest of them 2,386 lines, and all 10,490 lines overall.
 
 Cross-checked against the 224 keywords in the QB 4.5 help index, every
 documented statement and function is either an identified opcode or handled by
@@ -460,8 +469,8 @@ their bare form. Functions do the same: `INSTR`, `LBOUND`, `UBOUND`, `MID$`,
 
 The opcode table is dense enough that the holes in it are a usable map of what
 has not been reached, and working through them is what found most of the
-above. The statement range is now 219 of 256 assigned and the function range
-121 of 128. Functions run alphabetically, so an unassigned code sits next to
+above. The statement range is now 224 of 256 assigned and the function range
+122 of 128. Functions run alphabetically, so an unassigned code sits next to
 the name it belongs to; every function-range hole examined that way turned out
 to be an argument-count variant of its neighbour. Statement holes are less
 orderly but still cluster next to the keyword they vary.
@@ -500,13 +509,13 @@ of this section.
 - The four `head` words and `unknown_c` in the section trailer.
 - The hash QB computes for a name, as described under the symbol table. The
   hash for numeric labels is known; this one is not.
-- 33 statement opcodes are still unassigned: `02 03 07 08 09 13 14 21 22 24 25
-  30 34 35 36 4b 5a 5c 5f 7b 7c 8b 8c 8d 8e 98 99 a7 b0 cb d1 dc ef`. Some of
+- 32 statement opcodes are still unassigned: `02 03 07 08 09 13 14 21 24 25 30
+  34 35 36 4b 5a 5c 5f 7b 7c 8b 8c 8d 8e 98 99 a7 b0 cb d1 dc ef`. Some of
   these are certainly variants of their neighbours, in the way that `00b2` is
   `GET #` with the record number left out. `0098` is the second word of `STOP`,
   which is always stored as `0075 0098`; what the second word records is not
   known, but it is the same in every sample.
-  The seven unassigned function codes are `0108 0122 014c 0152 0176 017e 017f`.
+  The six unassigned function codes are `0108 0122 014c 0152 017e 017f`.
 
 ### What would help most
 
@@ -529,6 +538,12 @@ Three things would move it further, in order of what they would buy:
   compression). Decoding it would enumerate every documented form mechanically
   instead of leaving the last 33 statement opcodes to be guessed at from what
   sits next to them in the table.
+- **More real-world programs.** Three large ones (a NES emulator and both
+  modules of an 8086 emulator, 5,342 lines between them) found eleven bugs in
+  an afternoon that fifty synthetic samples had not: tab indentation, the
+  suffix rules for long literals, the `DEF<type>` delta between sections, and
+  `EXIT DEF` among them. Programs written by other people exercise different
+  habits.
 - **Files from other versions.** Everything here is QuickBASIC 4.5. QB 4.0 and
   the BASIC 7.x PDS releases wrote their own variants of this format, and some
   of the unassigned opcodes are plausibly theirs, since the table would have

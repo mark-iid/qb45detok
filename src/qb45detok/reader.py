@@ -36,6 +36,8 @@ BUCKETS_END = BUCKETS_OFF + BUCKET_COUNT * 2  # 0x6e
 FREE_REF_OFF = 0x6E  # ref one past the last name-table entry
 NAMES_OFF = 0x72  # == REF_BASE + 0x56
 CODE_REF_OFF = 0x1A
+#: Flags byte: 0x80 indent with tabs, 0x40 edited in the QB editor.
+FLAGS_OFF = 0x13
 
 #: Every code section is followed by a 16-byte trailer.
 _TRAILER_LEN = 16
@@ -134,6 +136,8 @@ class Section:
     name: Optional[str] = None  #: procedure name; ``None`` for module text
     declared_length: Optional[int] = None  #: length word preceding the stream
     kind_byte: Optional[int] = None  #: procedure preamble byte, 0x30 or 0x38
+    proc_kind: Optional[int] = None  #: 1 for a SUB, 2 for a FUNCTION
+    return_type: Optional[int] = None  #: a FUNCTION's return type, else 0
 
     @property
     def is_module(self) -> bool:
@@ -251,10 +255,11 @@ class BinFile:
         """A procedure section.
 
         ``00 <namelen> 00 <name>`` names it, then a five-byte preamble
-        ``01 00 <kind> <u16 length>`` introduces the token stream. Skipping
-        the preamble matters for more than tidiness: the stream is a sequence
-        of 16-bit words and the name is variable-length, so reading words from
-        the wrong byte shifts every opcode.
+        ``<1 SUB | 2 FUNCTION> <return type> <kind> <u16 length>`` introduces
+        the token stream. Skipping the preamble matters for more than tidiness:
+        the stream is a sequence of 16-bit words and the name is
+        variable-length, so reading words from the wrong byte shifts every
+        opcode.
         """
         d = self.data
         if off + 3 > len(d):
@@ -272,6 +277,8 @@ class BinFile:
             name=d[off + 3 : name_end].decode("latin-1"),
             declared_length=declared,
             kind_byte=d[name_end + 2],
+            proc_kind=d[name_end],
+            return_type=d[name_end + 1],
         )
 
     def _read_trailer(self, off: int) -> Trailer:
@@ -294,6 +301,16 @@ class BinFile:
     def free_ref(self) -> int:
         """Ref one past the last name-table entry."""
         return _u16(self.data, FREE_REF_OFF)
+
+    @property
+    def uses_tabs(self) -> bool:
+        """Whether QB writes this program's indentation as tabs.
+
+        Bit 0x80 of the flags byte at 0x13. QB sets it for a program whose
+        source was indented with tabs and then writes each line's indent back
+        out as ``indent // 8`` tabs followed by ``indent % 8`` spaces.
+        """
+        return bool(self.data[FLAGS_OFF] & 0x80)
 
     @property
     def has_standard_header(self) -> bool:

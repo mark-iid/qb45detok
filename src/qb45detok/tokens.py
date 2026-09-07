@@ -66,12 +66,14 @@ def expand_runs(payload: bytes) -> bytes:
 #: an inline ``X = 1    ' note`` keeps its spacing. The same opcode also
 #: carries a non-text payload on ``DIM ... AS <type>`` lines, which is why
 #: callers check for NUL bytes before treating a payload as source.
-TEXT_PAYLOAD_OPS = frozenset({0x000A, 0x0097, 0x00A6, 0x00E3})
+TEXT_PAYLOAD_OPS = frozenset({0x000A, 0x0097, 0x00A6})
 #: The comment opcode.
 REM = 0x0097
 
 #: Opcodes whose ``str`` payload is source text with no leading word.
-RAW_TEXT_OPS = frozenset()
+#: ``REM`` written as the keyword carries its text with no leading
+#: column word, unlike the apostrophe form.
+RAW_TEXT_OPS = frozenset({0x00E3})
 
 #: Opcodes whose ``str`` payload is a procedure signature.
 SIGNATURE_OPS = frozenset({0x0044, 0x0058, 0x0076})
@@ -186,6 +188,7 @@ _OPS = [
     _op(0x0174, "NOT", (), 1, "NOT", "prefix"),
     _op(0x0175, "OR", (), 2, "OR", "infix"),
     _op(0x0177, "SUBTRACT", (), 2, "-", "infix"),
+    _op(0x0176, "POWER", (), 2, "^", "infix"),
     _op(0x0178, "NEGATE", (), 1, "-", "prefix"),
     _op(0x0179, "XOR", (), 2, "XOR", "infix"),
     _op(0x017A, "UEVENT", (), 0, "UEVENT", "stmt"),
@@ -265,6 +268,9 @@ _OPS = [
     # line, always last, and it produces no text.
     _op(0x0017, "DOTTED_NAME", (), 0, None, "stmt"),
     _op(0x0018, "DIM_ARRAY", (), 0, None, "stmt"),
+    # Follows a comment and supplies the metacommand text, which is not
+    # stored: "'$DYNAMIC" is an empty REM plus this.
+    _op(0x0022, "META_DYNAMIC", ("u16",), 0, "$DYNAMIC", "stmt"),
     _op(0x00E2, "READ", (), None, "READ", "stmt"),
     _op(0x001A, "SHARED", (), 0, "SHARED", "stmt"),
     _op(0x001B, "DEFTYPE", ("u16", "u16", "u16"), 0, "DEFINT", "stmt"),
@@ -296,7 +302,7 @@ _OPS = [
     _op(0x0085, "FIELD_STMT", (), None, "FIELD", "stmt"),
     _op(0x0086, "FIELD_ITEM", (), 2, None, "stmt"),
     _op(0x007D, "PRINT_FILE", (), None, "PRINT #", "stmt"),
-    _op(0x0087, "LINE_INPUT_FILE", (), None, "LINE INPUT #", "stmt"),
+    _op(0x0087, "INPUT_CHANNEL", (), None, "LINE INPUT #", "stmt"),
     _op(0x0088, "INPUT", (), None, "INPUT", "stmt"),
     _op(0x008A, "FILE_NUMBER", (), 1, "#", "stmt"),
     # Counted payload: byte 0 is the punctuation flags, then one byte per
@@ -350,7 +356,7 @@ _OPS = [
     _op(0x00C3, "LPRINT", (), None, "LPRINT", "stmt"),
     _op(0x00E0, "RANDOMIZE_BARE", (), 0, "RANDOMIZE", "stmt"),
     _op(0x00E1, "RANDOMIZE", (), 1, "RANDOMIZE", "stmt"),
-    _op(0x00E3, "REM_META", ("u16", "u16", "u16", "u16"), 0, "REM", "stmt"),
+    _op(0x00E3, "REM_META", ("str",), 0, "REM", "stmt"),
     _op(0x00E4, "RESET", (), 0, "RESET", "stmt"),
     _op(0x00E5, "RMDIR", (), 1, "RMDIR", "stmt"),
     _op(0x00E6, "RSET", (), 2, "RSET", "stmt"),

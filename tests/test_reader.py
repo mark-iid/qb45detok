@@ -47,7 +47,7 @@ def procedures_in_text(text):
 
 
 def test_corpus_is_present():
-    assert len(NAMES) == 49, "expected forty-nine matched pairs in corpus/"
+    assert len(NAMES) == 52, "expected fifty-two matched pairs in corpus/"
 
 
 def test_parses(pair):
@@ -101,9 +101,18 @@ def test_sections_cover_the_file_without_gaps(pair):
 
 
 def test_procedure_sections_match_the_subs_in_the_text(pair):
+    """Every code section is a procedure the text defines.
+
+    Not the other way round. A module belonging to a multi-module project
+    carries the other module's procedures as untokenized source text rather
+    than as sections of its own, so the text can define more procedures than
+    the file has sections. `QB8086` does exactly that with 52 of them.
+    """
     _, bf, text = pair
     got = sorted(s.name.lower() for s in bf.sections[1:])
-    assert got == sorted(procedures_in_text(text))
+    in_text = procedures_in_text(text)
+    assert set(got) <= set(in_text)
+    assert len(got) == len(set(got))
 
 
 def test_procedure_line_counts_match_the_text(pair):
