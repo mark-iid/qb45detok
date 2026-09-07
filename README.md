@@ -68,6 +68,19 @@ symbol table, the opcode encodings, and the parts I still cannot explain. If
 you want to write your own reader, or port this to another language, start
 there.
 
+## Reading old data files
+
+Random access files written by these programs hold numbers in Microsoft Binary
+Format, which predates IEEE 754. `qb45detok.mbf` converts both ways, so a data
+file saved through `MKSMBF$` or `MKDMBF$` can be read from Python:
+
+```python
+from qb45detok import mbf
+
+mbf.single_to_float(b"\x00\x00\x00\x81")   # 1.0
+mbf.float_to_double(3.14159)
+```
+
 ## Install
 
 ```
@@ -82,6 +95,17 @@ Python 3.9 or newer. No dependencies.
 qb45detok detok PROGRAM.BAS              # write source to stdout
 qb45detok detok PROGRAM.BAS -o OUT.BAS   # write a CRLF text file
 ```
+
+If you have a directory of old files and do not know what is in it, start
+here:
+
+```
+qb45detok triage OLDDISK/            # what each file is, and what will read it
+qb45detok triage OLDDISK/ --convertible   # just the ones this tool handles
+```
+
+Every BASIC of the era is identified by its first byte, so this costs nothing
+and saves feeding the wrong file to the wrong tool.
 
 It also reads QuickBASIC's own help databases, which are a separate Microsoft
 format that nothing modern opens:

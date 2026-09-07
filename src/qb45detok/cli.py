@@ -10,6 +10,7 @@ from typing import List, Optional
 from .decode import decode_file, decode_section
 from .render import Renderer
 from .quickhelp import HelpFile, QuickHelpError
+from .triage import scan
 from .reader import BinFile, ParseError, REF_BASE, Section
 
 
@@ -219,6 +220,30 @@ def cmd_hlp_dump(args) -> int:
     return 0
 
 
+# -- triage -------------------------------------------------------------
+
+def cmd_triage(args) -> int:
+    """Say what each file in a pile of old BASIC actually is."""
+    findings = scan([Path(p) for p in args.paths], args.pattern)
+    if not findings:
+        print("qb45detok: nothing matched", file=sys.stderr)
+        return 1
+    width = max(len(f.path.name) for f in findings)
+    counts = {}
+    for f in findings:
+        counts[f.kind] = counts.get(f.kind, 0) + 1
+        if args.convertible and not f.readable_here:
+            continue
+        first = f"{f.first_byte:02x}" if f.first_byte is not None else "--"
+        note = f"  {f.detail}" if f.detail else ""
+        print(f"{f.path.name:<{width}}  {first}  {f.kind:<32} {f.tool}{note}")
+    if not args.convertible:
+        print()
+        for kind, n in sorted(counts.items(), key=lambda kv: -kv[1]):
+            print(f"  {n:5}  {kind}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="qb45detok",
@@ -255,6 +280,14 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("file")
     t.add_argument("-o", "--output", help="write CRLF text to this file instead of stdout")
     t.set_defaults(func=cmd_detok)
+
+    tr = sub.add_parser("triage", help="identify a directory of old BASIC files")
+    tr.add_argument("paths", nargs="+", help="files or directories to look at")
+    tr.add_argument("--pattern", default="*.BAS",
+                    help="filename pattern to search directories for")
+    tr.add_argument("--convertible", action="store_true",
+                    help="list only the files this tool can convert")
+    tr.set_defaults(func=cmd_triage)
 
     hl = sub.add_parser("hlp-list", help="list the contexts in a QuickHelp .HLP file")
     hl.add_argument("file")
