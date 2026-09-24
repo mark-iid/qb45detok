@@ -65,28 +65,39 @@ in a hashed symbol table and refers to them by offset rather than storing names
 inline, and statements are stored in reverse Polish rather than as a flat token
 list, so the detokenizers written for GW-BASIC and its relatives do not read it.
 
-One other tool does. QB64 Phoenix Edition ships [QB45BIN], written by qarnos,
-which its IDE runs when it opens a 4.5 binary and which works from the command
-line too:
+Two other projects do read it. QB64 Phoenix Edition builds [QB45BIN], by
+qarnos, which its IDE runs when it opens a 4.5 binary and which also works from
+the command line. [jeredw/qbc], a QBasic for the browser, has a `Qb45Format.ts`
+written on top of that. Both go one way only, and both are a part of something
+larger rather than a thing you can pick up on its own.
 
-```
-QB45BIN PROGRAM.BAS -o PROGRAM.TXT
-```
+|  | QB45BIN | qbc | this |
+|---|---|---|---|
+| binary to text | yes | yes | yes |
+| text to binary | no | no | yes |
+| the format written up | no | no | `docs/format.md` |
+| shipped as | a utility inside QB64pe | a class inside a web app | a CLI and a library |
+| needs | QB64 Phoenix Edition | a browser | Python 3.9, no dependencies |
 
-I did not know about it when I started, and an earlier version of this file
-claimed nothing existed. That was wrong. Its rule table and mine were arrived
-at separately and they agree wherever both have an entry, which is worth more
-than either on its own; it also settles two opcodes I had down as unknown, and
-`docs/format.md` says which.
+Where the three opcode tables overlap they agree, which is worth more than any
+of them alone. Twelve entries here are in neither of the others: `GOSUB`,
+`GOTO`, `IF ... THEN` and `PUT` each have a second form that QuickBASIC writes
+and those two do not decode; `SEG` marks an argument passed by segment; `TO`
+and `CHDRIVE` are keywords 4.5 keeps a slot for and will not print, which took
+BASIC 7 PDS to read back; and five more are markers that carry no text, which a
+decoder still has to know about so as not to choke on them.
 
-What it does not do is write the format, and it does not come with a
-description of one. That is the gap this fills: conversion both ways, a library
-rather than a single shell command, and `docs/format.md`, which sets out the
-layout, the symbol table, the opcode encodings and the parts I still cannot
-explain. If you want to write your own reader, or port this to another
-language, start there.
+Going the other way is what turned up most of that. Writing the format settled
+the argument markers, the jump slots left empty until a program runs, the
+separate opcode per written form of `LINE`, `CIRCLE`, `PSET`, `GET` and `PUT`,
+and the default types a procedure records at its head.
+
+`docs/format.md` is the result written up: the layout, the symbol table, the
+opcode encodings, and the parts I still cannot explain. If you want to write
+your own reader, or port this to another language, start there.
 
 [QB45BIN]: https://github.com/QB64-Phoenix-Edition/QB64pe
+[jeredw/qbc]: https://github.com/jeredw/qbc
 
 ## Writing the format
 
