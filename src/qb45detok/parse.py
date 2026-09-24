@@ -188,11 +188,19 @@ def _parse_statement(cur: Cursor) -> List[Emit]:
 
 def _metacommand(text: str) -> List[Emit]:
     """$DYNAMIC and $STATIC are comments that QB also marks as instructions."""
-    word = text.strip().upper().split(":")[0]
+    body = text.strip()
+    word = body.upper().split(":")[0]
     if word == "$DYNAMIC":
         return [Emit("META_DYNAMIC")]
     if word == "$STATIC":
         return [Emit("META_STATIC")]
+    if word == "$INCLUDE":
+        # The path is stored with the quote that closes it and without the
+        # one that opens it, which is how QB writes it back out.
+        path = body.split(":", 1)[1].strip()
+        if path.startswith("'"):
+            path = path[1:]
+        return [Emit("META_INCLUDE", (), path)]
     return []
 
 

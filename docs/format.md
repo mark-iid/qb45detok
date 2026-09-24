@@ -600,6 +600,28 @@ range is 127 of 128. What is left isn't a statement at all.
   and `0014` behave the same way: handed to QB as a statement, each sends it
   into a loop writing lines until it is stopped.
 
+### Three fields the `$INCLUDE` run settled
+
+Writing that one file back out to the byte exposed three things a reader had
+never had to get right.
+
+**The label offset is a chain.** The first word of a labelled line's pair is
+not the line's own position: it is where the *next* labelled line's pair
+begins, that is, the next label header's offset plus two. The last one in a
+section holds `ffff`. Verified: 98 links across all 58 corpus files, no
+exceptions.
+
+**The first trailer head word is the start of that chain**, or `ffff` when the
+section has no labels at all. Verified in all 254 sections. That leaves three
+of the four head words unexplained rather than four.
+
+**A payload is padded with whatever came next.** The length word counts only
+the text, so the byte that pads an odd payload to an even length is never read
+back, and QB leaves whatever its buffer held there. It is a NUL most of the
+time, but after a string literal it is the quote that closed it: 782 of the 783
+odd-length `PUSH_STR` payloads in the corpus are padded with `"`. The one that
+is not is a string that ran to the end of the line with no closing quote.
+
 ### `$INCLUDE`
 
 Five values belong to `$INCLUDE`, and nothing in the original corpus used one,
@@ -635,6 +657,12 @@ statement, exactly as it does on an ordinary line. One wrinkle: a labelled
 included line is introduced by an *empty* `0002` header, which belongs to that
 line rather than being a line of its own. Fold it away and the section's line
 count matches its trailer again.
+
+`tokenize.py` writes all of this. It reads the `.BI` from beside the source and
+expands it the way QB does, so the code section and the trailer of the sample
+come back byte for byte identical to the file QuickBASIC saved. Only the bucket
+array and the name-table links differ, which is the name hash and nothing to do
+with includes.
 
 Two other projects read these before this did, and both were right: `QB45BIN`
 pairs `0034` and `0035` with the labelled line headers in its rule table, and
@@ -758,9 +786,10 @@ What would help now, in order:
   checked.
 - **PDS-written files.** PDS reads 4.5 files correctly, but what it writes
   hasn't been looked at.
-- **Tokenizing `$INCLUDE`.** The reader handles it. The writer does not: a
-  `REM $INCLUDE:` line goes back out as an ordinary comment, so the text
-  round-trips but the bytes don't.
+- **Byte-identical output from the tokenizer.** `INCL.BAS` comes back byte for
+  byte apart from the hash fields, but it is a small program. Across the corpus
+  most files still differ in length, mostly in how the name table is ordered
+  and laid out. The text round trip is what holds generally.
 - **The last four example batches.** Five of the nine round-trip exactly and
   are in the corpus. The other four differ on twenty lines: two are the `LOCK`
   ambiguity described above, some are a name recorded in one letter case and

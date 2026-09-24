@@ -12,8 +12,8 @@ from conftest import requires_corpus, CORPUS_TXT
 from qb45detok.decode import decode_file
 from qb45detok.reader import BinFile
 from qb45detok.render import Renderer
-from qb45detok.tokenize import (Tokenizer, indent_of, record_variables,
-                                split_sections, tokenize)
+from qb45detok.tokenize import (IncludeNotFound, Tokenizer, indent_of,
+                                record_variables, split_sections, tokenize)
 
 #: Files whose text the round trip does not reproduce, and why. None of these
 #: is a disagreement about tokenizing; ``docs/format.md`` describes each.
@@ -37,8 +37,8 @@ def read_back(data):
     return Renderer(bf).file(decode_file(bf))
 
 
-def round_trip(text):
-    return read_back(tokenize(text))
+def round_trip(text, base_dir=None):
+    return read_back(tokenize(text, base_dir))
 
 
 # -- the whole trip -----------------------------------------------------
@@ -50,7 +50,7 @@ def test_source_survives_the_round_trip(name):
     text = (CORPUS_TXT / name).read_text(encoding="latin-1")
     if name in KNOWN_DIFFERENT:
         pytest.skip("a documented difference, not a tokenizing one")
-    assert round_trip(text) == text.splitlines()
+    assert round_trip(text, CORPUS_TXT) == text.splitlines()
 
 
 def test_the_output_is_a_quickbasic_file():
@@ -142,6 +142,35 @@ def test_two_blank_lines_are_stored():
     """One is the separator a text export adds; the rest were written."""
     parts = split_sections("PRINT 1\n\n\nSUB Greet\nEND SUB\n")
     assert parts[0].lines == ["PRINT 1", "", ""]
+
+
+def test_an_include_is_expanded_the_way_qb_expands_it(tmp_path):
+    """QB stores every line of the .BI and leaves them out of its text."""
+    (tmp_path / "BITS.BI").write_text("CONST Wide = 3\nInside:\nPRINT Wide\n")
+    text = "REM $INCLUDE: 'BITS.BI'\nPRINT Wide\nEND"
+    data = tokenize(text, tmp_path)
+    bf = BinFile.parse(data)
+    lines = [l for ds in decode_file(bf) for l in ds.lines]
+    assert sum(1 for l in lines if l.included) == 3
+    assert bf.sections[0].trailer.included_count == 3
+    # ...and none of them comes back as text.
+    assert read_back(data) == text.splitlines() + [""]
+
+
+def test_a_missing_include_is_reported(tmp_path):
+    with pytest.raises(IncludeNotFound):
+        tokenize("REM $INCLUDE: 'NOPE.BI'\nEND", tmp_path)
+
+
+def test_labelled_lines_are_chained(tmp_path):
+    """Each labelled line points at the next, and the trailer at the first."""
+    data = tokenize("One:\nPRINT 1\nTwo:\nPRINT 2\nEND")
+    bf = BinFile.parse(data)
+    labelled = [l for ds in decode_file(bf) for l in ds.lines
+                if l.label_ref is not None]
+    assert labelled[0].label_offset == labelled[1].offset + 2
+    assert labelled[-1].label_offset == 0xFFFF
+    assert bf.sections[0].trailer.head[0] == labelled[0].offset + 2
 
 
 # -- what the whole program says ----------------------------------------

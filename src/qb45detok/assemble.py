@@ -209,12 +209,16 @@ class Assembler:
 
     def _e_push_str(self, emit: Emit) -> List[int]:
         body = (emit.text or "").encode("latin-1")
-        return [_BY_MNEMONIC["PUSH_STR"], len(body)] + _as_words(body)
+        return [_BY_MNEMONIC["PUSH_STR"], len(body)] + _as_words(body, b'"')
 
     def _e_rem(self, emit: Emit) -> List[int]:
         column = emit.operands[0] if emit.operands else 0
         body = struct.pack("<H", column) + (emit.text or "").encode("latin-1")
         return [tokens.REM, len(body)] + _as_words(body)
+
+    def _e_meta_include(self, emit: Emit) -> List[int]:
+        body = (emit.text or "").encode("latin-1")
+        return [_BY_MNEMONIC["META_INCLUDE"], len(body)] + _as_words(body)
 
     def _e_rem_meta(self, emit: Emit) -> List[int]:
         body = (emit.text or "").encode("latin-1")
@@ -475,10 +479,15 @@ class Assembler:
         return self.name_ref(named).ref
 
 
-def _as_words(body: bytes) -> List[int]:
-    """Pad a payload to an even length and unpack it as words."""
+def _as_words(body: bytes, pad: bytes = b"\x00") -> List[int]:
+    """Pad a payload to an even length and unpack it as words.
+
+    The length word counts the text, so the pad byte is never read back. QB
+    leaves whatever was next in its buffer there; a NUL matches it most
+    often, and a string literal is followed by the quote that closed it.
+    """
     if len(body) % 2:
-        body += b" "
+        body += pad
     return list(struct.unpack(f"<{len(body) // 2}H", body))
 
 

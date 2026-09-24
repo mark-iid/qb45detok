@@ -112,8 +112,10 @@ class NameEntry:
 class Trailer:
     """The 16 bytes that close every code section.
 
-    Four unidentified words, then the section's source line count, another
-    unidentified word, and a kind word. The leading words are often all 0xff,
+    Four words, then the section's source line count, another unidentified
+    word, and a kind word. The first of the four is where the section's chain
+    of labelled lines starts, and is ``0xffff`` when it has no labels; the
+    other three are still unexplained. The leading words are often all 0xff,
     which is why they once looked like a fixed signature; TORUS shows they are
     not, so sections are found by chaining declared lengths instead.
 
@@ -123,7 +125,7 @@ class Trailer:
     """
 
     offset: int
-    head: Tuple[int, int, int, int]  #: four u16s, purpose unknown
+    head: Tuple[int, int, int, int]  #: the first is the label chain head
     line_count: int  #: u16, source lines in the section (SUB..END SUB inclusive)
     included_count: int  #: u16, how many of them came from an include
     unknown_c: int  #: u16

@@ -225,8 +225,11 @@ def cmd_hlp_dump(args) -> int:
 
 def cmd_tok(args) -> int:
     """Read ASCII BASIC and write the binary QuickBASIC would have saved."""
-    text = Path(args.file).read_text(encoding="latin-1")
-    data = tokenize(text)
+    source = Path(args.file)
+    text = source.read_text(encoding="latin-1")
+    # An $INCLUDE is resolved beside the source, the way QB resolves it
+    # against the current directory.
+    data = tokenize(text, source.parent)
     if args.output:
         Path(args.output).write_bytes(data)
     else:

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 import struct
+from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from . import tokens
@@ -166,8 +167,11 @@ class Tokenizer:
     #: Set in header byte 0x13 when the file indents with tabs.
     TABS = 0x80
 
-    def __init__(self, text: str) -> None:
+    def __init__(self, text: str, base_dir=None) -> None:
         self.text = text
+        #: Where to look for an $INCLUDE file, normally beside the source.
+        self.base_dir = Path(base_dir) if base_dir is not None else None
+        self._include_files: Dict[str, int] = {}
         self.records = record_variables(text)
         self.asm = Assembler()
         self._types = [self.DEFAULT_TYPE] * 26
@@ -223,27 +227,55 @@ class Tokenizer:
             # nothing else, and is not written back out as text.
             words += [0] + self.asm.words_for([record])
             count += 1
+        labels: List[int] = []          # word index of each label's link slot
+        headers: List[int] = []         # byte offset of each labelled header
+        included = 0
         for line in part.lines:
-            words += self._line(line)
+            emitted, labelled, path = self._line(line)
+            if labelled:
+                headers.append(len(words) * 2)
+                labels.append(len(words) + 1)
+            words += emitted
             count += 1
+            if path is not None:
+                for inc, inc_labelled in self._included(path):
+                    if inc_labelled:
+                        headers.append((len(words) + 2) * 2)
+                        labels.append(len(words) + 3)
+                    words += inc
+                    count += 1
+                    included += 1
+        # Each labelled line points at the next one's first operand word, and
+        # the last says there is no next.
+        for i, slot in enumerate(labels):
+            words[slot] = headers[i + 1] + 2 if i + 1 < len(headers) else 0xFFFF
         words += list(tokens.END_OF_SECTION)
         body = struct.pack(f"<{len(words)}H", *words)
+        # The first of the trailer's four head words is the start of the
+        # label chain, and says there is none when a section has no labels.
+        chain = (headers[0] + 2, 0xFFFF, 0xFFFF, 0xFFFF) if headers \
+            else (0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF)
         if head is None:
-            return OutSection(body=body, line_count=count)
+            return OutSection(body=body, line_count=count,
+                              included_count=included, head=chain)
         keyword, name = _PROC.match(head).group(1), _PROC.match(head).group(2)
         kind_byte = 0xB8 if re.search(r"\bSTATIC\s*$", head, re.I) else 0x38
         suffix = name[-1] if name[-1] in "%&!#$" else ""
         self.asm.name_ref(name[:len(name) - len(suffix)] if suffix else name,
                           FLAG_SUB if keyword.upper() == "SUB" else 0)
         return OutSection(
-            body=body, line_count=count,
+            body=body, line_count=count, included_count=included, head=chain,
             name=name[:len(name) - len(suffix)] if suffix else name,
             kind_byte=kind_byte,
             proc_kind=1 if keyword.upper() == "SUB" else 2,
             return_type=_RETURN_TYPE.get(suffix, 0))
 
-    def _line(self, line: str) -> List[int]:
-        """One source line: its header word, any label, then its opcodes."""
+    def _line(self, line: str):
+        """One source line.
+
+        Returns its words, whether it carries a label, and the file named by
+        an ``$INCLUDE`` on it, whose lines the caller then emits.
+        """
         body = line.strip("\r\n").lstrip(" \t")
         indent = indent_of(line)
         column = indent
@@ -259,9 +291,10 @@ class Tokenizer:
             body = rest.lstrip(": ")
         header = (indent << tokens.INDENT_SHIFT) if indent < 32 else 0
         out: List[int] = []
+        include = None
         if label is not None:
             header |= tokens.LINE_HAS_LABEL
-            out += [0, self.asm.label_ref(label).ref]
+            out += [0xFFFF, self.asm.label_ref(label).ref]
         if indent >= 32:
             header |= tokens.LINE_HAS_INDENT
             out.append(indent)
@@ -273,6 +306,8 @@ class Tokenizer:
                     for emit in statement.emits:
                         if emit.mnemonic == "DEFTYPE":
                             self._apply(emit)
+                        if emit.mnemonic == "META_INCLUDE":
+                            include = emit.text
                         dotted = dotted or _has_period(emit)
                     words += self.asm.words_for(statement.emits)
                 if dotted:
@@ -283,7 +318,38 @@ class Tokenizer:
                 # QB keeps a line it cannot read as text, so that editing a
                 # file with a typo in it does not lose the typo.
                 words = words[:len(words) - len(out)] + out + _text_line(body)
-        return words
+        return words, label is not None, include
+
+    def _included(self, path: str):
+        """The lines of an ``$INCLUDE`` file, as QB stores them.
+
+        QuickBASIC expands the include when it saves and keeps every line, so
+        that a compile does not have to read the file again. Each line is
+        headed by a form of its own naming the file it came from.
+        """
+        name = path.rstrip("'\"").strip()
+        source = None
+        for base in (self.base_dir, Path(".")):
+            if base is not None and (base / name).is_file():
+                source = (base / name).read_text(encoding="latin-1")
+                break
+        if source is None:
+            raise IncludeNotFound(name)
+        self._include_files.setdefault(name.upper(), len(self._include_files) + 1)
+        which = self._include_files[name.upper()]
+        for line in source.splitlines():
+            words, labelled, _ = self._line(line)
+            header, rest = words[0], words[1:]
+            if labelled:
+                # A labelled included line is introduced by an empty header,
+                # and then takes the same label pair an ordinary one does.
+                gap = header >> tokens.INDENT_SHIFT
+                if gap > 1:
+                    yield [0x0002, which, 0x0035, rest[0], rest[1], gap] + rest[2:], True
+                else:
+                    yield [0x0002, which, 0x0034] + rest, True
+            else:
+                yield [0x0002, which] + rest, False
 
 
 def _has_period(emit: Emit) -> bool:
@@ -310,6 +376,14 @@ def _text_line(body: str) -> List[int]:
 _RETURN_TYPE = {"%": 1, "&": 2, "!": 3, "#": 4, "$": 5}
 
 
-def tokenize(text: str) -> bytes:
-    """The binary QuickBASIC would have saved for this source."""
-    return Tokenizer(text).build()
+class IncludeNotFound(FileNotFoundError):
+    """Raised when an ``$INCLUDE`` names a file that is not beside the source."""
+
+
+def tokenize(text: str, base_dir=None) -> bytes:
+    """The binary QuickBASIC would have saved for this source.
+
+    ``base_dir`` is where an ``$INCLUDE`` is looked up, normally the directory
+    the source itself came from.
+    """
+    return Tokenizer(text, base_dir).build()

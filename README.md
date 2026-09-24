@@ -211,11 +211,10 @@ to look. Nothing is guessed at quietly.
   line headers or other structure rather than statements, and the single
   unassigned function code is an unused slot in the type-conversion family
   rather than a missing name.
-- `$INCLUDE` reads but doesn't write. QuickBASIC stores every line of the
-  included file in the binary and leaves them out when it saves as text, and
-  `detok` does the same. The tokenizer has no idea, so a `REM $INCLUDE:` line
-  goes back out as an ordinary comment: the text survives the round trip and
-  the bytes don't.
+- `$INCLUDE` works both ways. QuickBASIC stores every line of the included
+  file in the binary and leaves them out when it saves as text, and both
+  directions here do the same. `tok` reads the `.BI` from beside the source,
+  so it has to be there.
 - A handful of statement forms are stored identically and can't be told apart.
   `LOCK #1, TO 32` and `LOCK #1, 1 TO 32` produce the same tokens, so the first
   comes back as the second.
