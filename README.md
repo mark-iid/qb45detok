@@ -34,18 +34,18 @@ head -c 1 OLDPROG.BAS | od -An -tx1
 | `f9`, `f1`, `f3` | older Microsoft BASIC | [decode_ms_basic.py] |
 | printable text | already ASCII | nothing to do |
 
-Only the `fc` row is something I have verified myself, across fifty-seven files.
-The rest is from those projects' own documentation, and is here so you do not
+Only the `fc` row is something I've verified myself, across fifty-seven files.
+The rest is from those projects' own documentation, and is here so you don't
 waste time on the wrong tool, as I did.
 
-A note on versions. I have only tested this against QuickBASIC 4.5. QuickBASIC
+A note on versions. I've only tested this against QuickBASIC 4.5. QuickBASIC
 4.0 and the later PDS / BASIC 7.x releases wrote their own variants, and QBasic
-1.1, the cut-down one bundled with MS-DOS 5 and 6, saves plain text only, so
-its files need nothing. If you have a `0xFC` file from something other than 4.5
-and it does not decode, that is worth reporting.
+1.1 (the cut-down one bundled with MS-DOS 5 and 6) saves plain text only, so its
+files need nothing. If you have a `0xFC` file from something other than 4.5 and
+it doesn't decode, that's worth reporting.
 
-If you are trying to decompile a QuickBASIC `.EXE` rather than read a `.BAS`,
-that is a different problem: see [qbasic-reversing-notes].
+If you're trying to decompile a QuickBASIC `.EXE` rather than read a `.BAS`,
+that's a different problem: see [qbasic-reversing-notes].
 
 [bascat]: https://github.com/rwtodd/bascat
 [gwbasic-decoder]: https://github.com/danvk/gwbasic-decoder
@@ -53,23 +53,24 @@ that is a different problem: see [qbasic-reversing-notes].
 [decode_ms_basic.py]: https://mac-guyver.com/switham/2008/05/Decode_MS_BASIC/
 [qbasic-reversing-notes]: https://github.com/maurom/qbasic-reversing-notes
 
-## Why I wrote it
+## Other tools that read this format
 
 The only way I had to read these files was to boot DOS, load each one into
-`QB.EXE`, and do File > Save As > Text. That is slow, it needs a working DOS
-setup, and it has a nasty failure mode: pick the wrong format on the way out
-and you get a file that looks converted and isn't.
+`QB.EXE`, and do File > Save As > Text. That's slow, it needs a working DOS
+setup, and it has a nasty failure mode: pick the wrong format on the way out and
+you get a file that looks converted and isn't.
 
-QuickBASIC 4.5 is not like the other formats listed above. It keeps identifiers
-in a hashed symbol table and refers to them by offset rather than storing names
-inline, and statements are stored in reverse Polish rather than as a flat token
-list, so the detokenizers written for GW-BASIC and its relatives do not read it.
+QuickBASIC 4.5 isn't like the other formats in the table above. It keeps
+identifiers in a hashed symbol table and refers to them by offset rather than
+storing names inline, and statements are stored in reverse Polish rather than as
+a flat token list, so the detokenizers written for GW-BASIC and its relatives
+don't read it.
 
-Two other projects do read it. QB64 Phoenix Edition builds [QB45BIN], by
-qarnos, which its IDE runs when it opens a 4.5 binary and which also works from
-the command line. [jeredw/qbc], a QBasic for the browser, has a `Qb45Format.ts`
-written on top of that. Both go one way only, and both are a part of something
-larger rather than a thing you can pick up on its own.
+Two other projects do. QB64 Phoenix Edition builds [QB45BIN], by qarnos, which
+its IDE runs when it opens a 4.5 binary and which also works from the command
+line. [jeredw/qbc], a QBasic for the browser, has a `Qb45Format.ts` written on
+top of that. Both convert in one direction, and both are a component of a larger
+program rather than something you can pick up on its own.
 
 |  | QB45BIN | qbc | this |
 |---|---|---|---|
@@ -79,22 +80,22 @@ larger rather than a thing you can pick up on its own.
 | shipped as | a utility inside QB64pe | a class inside a web app | a CLI and a library |
 | needs | QB64 Phoenix Edition | a browser | Python 3.9, no dependencies |
 
-Where the three opcode tables overlap they agree, which is worth more than any
-of them alone. Twelve entries here are in neither of the others: `GOSUB`,
-`GOTO`, `IF ... THEN` and `PUT` each have a second form that QuickBASIC writes
-and those two do not decode; `SEG` marks an argument passed by segment; `TO`
-and `CHDRIVE` are keywords 4.5 keeps a slot for and will not print, which took
-BASIC 7 PDS to read back; and five more are markers that carry no text, which a
-decoder still has to know about so as not to choke on them.
+Where the three opcode tables overlap, they agree. Twelve entries here are in
+neither of the others. `GOSUB`, `GOTO`, `IF ... THEN` and `PUT` each have a
+second form that QuickBASIC writes and those two don't decode. `SEG` marks an
+argument passed by segment. `TO` and `CHDRIVE` are keywords 4.5 keeps a slot for
+and won't print, which took BASIC 7 PDS to read back. The remaining five are
+markers that carry no text, which a decoder still has to know about so it
+doesn't choke on them.
 
-Going the other way is what turned up most of that. Writing the format settled
-the argument markers, the jump slots left empty until a program runs, the
-separate opcode per written form of `LINE`, `CIRCLE`, `PSET`, `GET` and `PUT`,
-and the default types a procedure records at its head.
+Going the other way turned up most of that. Writing the format settled the
+argument markers, the jump slots left empty until a program runs, the separate
+opcode per written form of `LINE`, `CIRCLE`, `PSET`, `GET` and `PUT`, and the
+default types a procedure records at its head.
 
 `docs/format.md` is the result written up: the layout, the symbol table, the
-opcode encodings, and the parts I still cannot explain. If you want to write
-your own reader, or port this to another language, start there.
+opcode encodings, and the parts I still can't explain. If you want to write your
+own reader, or port this to another language, start there.
 
 [QB45BIN]: https://github.com/QB64-Phoenix-Edition/QB64pe
 [jeredw/qbc]: https://github.com/jeredw/qbc
@@ -109,8 +110,8 @@ back to QB 4.5 without opening the DOS editor.
 qb45detok tok PROGRAM.TXT -o PROGRAM.BAS
 ```
 
-That is the strongest test of the format there is. Reading a file lets you skip
-the fields you have not worked out; writing one does not. Every corpus program
+Writing a format is a harder check than reading one, since a reader can skip a
+field it hasn't worked out and still look correct. Every corpus program
 detokenizes, tokenizes and detokenizes again to the same text, bar the eight
 cases `docs/format.md` sets out, and the opcodes chosen match the ones
 QuickBASIC stored on every one of the 10,876 lines it tokenized.
@@ -148,8 +149,7 @@ qb45detok detok PROGRAM.BAS -o OUT.BAS   # write a CRLF text file
 qb45detok tok PROGRAM.TXT -o OUT.BAS     # and back again
 ```
 
-If you have a directory of old files and do not know what is in it, start
-here:
+If you have a directory of old files and don't know what's in it, start here:
 
 ```
 qb45detok triage OLDDISK/            # what each file is, and what will read it
@@ -184,15 +184,14 @@ qb45detok stats PROGRAM.BAS        # how much of the token stream is identified
 
 ## How well it works
 
-Across the fifty-seven programs I have tested it on (my own code, a QuickBASIC
-sample, and small programs written to exercise one feature each) **every one
-comes back byte for byte identical** to what QuickBASIC itself writes with
-Save As Text. The largest is 2,386 lines.
+Across the fifty-seven programs I've tested it on (my own code, a QuickBASIC
+sample, and small programs written to exercise one feature each) every one comes
+back byte for byte identical to what QuickBASIC itself writes with Save As Text.
+The largest is 2,386 lines.
 
 Every opcode in those programs is identified, and all 253 code sections decode
-to exactly the line count the file records for them. Writing the format back
-out is a stronger check than reading it, and the writer rebuilds all 57 files
-byte for byte from their own decoded structure.
+to exactly the line count the file records for them. The writer rebuilds all 57
+files byte for byte from their own decoded structure.
 
 I also checked the opcode table against the 224 keywords in the QuickBASIC 4.5
 help index. Every documented statement and function is covered. The only index
@@ -200,29 +199,29 @@ entries left over are `ABSOLUTE`, `INTERRUPT` and `INTERRUPTX`, which are
 routines in `QB.QLB` rather than keywords, and which come through as ordinary
 `CALL` targets.
 
-Nothing is guessed at silently. If the decoder cannot express a statement it
-writes a marker on that line rather than dropping it or inventing something,
-and `detok` exits non-zero so you know to look.
+If the decoder can't express a statement it writes a marker on that line rather
+than dropping it or inventing something, and `detok` exits non-zero so you know
+to look. Nothing is guessed at quietly.
 
 ## Limits
 
-- A statement I have not run through it would show up as a marked line rather
-  than silently wrong output. That is the main thing to know: the tool fails
-  loudly rather than quietly.
-- Fourteen of the 256 statement opcodes are still unidentified, but most of
-  them are not missing statements. Nine are the line-header values, which
-  cannot be statements at all; two more behave the same way, sending QB into
-  a loop when it is handed one. That leaves three: two that write only a
-  colon, and one that neither QuickBASIC 4.5 nor BASIC 7 will render. The one
-  unassigned function code is an unused slot in the type-conversion family
-  rather than a missing name.
-- A handful of statement forms are stored identically and cannot be told
-  apart. `LOCK #1, TO 32` and `LOCK #1, 1 TO 32` produce the same tokens, so
-  the first comes back as the second.
+- A statement I haven't run through it would show up as a marked line rather
+  than as silently wrong output.
+- Eleven of the 256 statement opcodes are unassigned, and none of them is a
+  missing statement. Nine are line-header values, which can't be statements at
+  all, and two more behave the same way, sending QB into a loop when it is
+  handed one. The single unassigned function code is an unused slot in the
+  type-conversion family rather than a missing name.
+- Three opcodes belong to `$INCLUDE`, which nothing in my corpus uses. They're
+  placed from the other two projects' tables rather than from a run here, so
+  `tokens.py` doesn't carry them yet.
+- A handful of statement forms are stored identically and can't be told apart.
+  `LOCK #1, TO 32` and `LOCK #1, 1 TO 32` produce the same tokens, so the first
+  comes back as the second.
 - Only QuickBASIC 4.5 is tested. I have no QuickBASIC 4.0 files, so what that
   version writes is untested rather than known. BASIC 7 PDS files are also
-  untested, though PDS reads 4.5 files correctly, and its editor was useful
-  for identifying two opcodes 4.5 knows about but will not print.
+  untested, though PDS reads 4.5 files correctly, and its editor was useful for
+  identifying two opcodes 4.5 knows about but won't print.
 
 `docs/format.md` lists the open questions, including the hypotheses I ruled out
 by experiment so nobody repeats them, and how to ask QuickBASIC itself what an
