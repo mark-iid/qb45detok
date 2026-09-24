@@ -5,6 +5,14 @@ for the same programs. None of it comes from documentation. Anything marked
 Verified is checked by the test suite against every pair in the corpus; the
 rest is observation that still needs confirming.
 
+One other description of this format exists in runnable form: `QB45BIN.bas`,
+by qarnos, which QB64 Phoenix Edition ships at
+`internal/support/converter/QB45BIN.bas` and runs when its IDE opens a 4.5
+binary. It is a rule table rather than prose, it reads the format without
+writing it, and it was arrived at separately from this. The two agree wherever
+both have an entry, and where it says something this did not work out, the
+text below says so.
+
 ## Overall layout
 
 | Offset | Size | Contents |
@@ -583,7 +591,7 @@ which is how the placement came to be testable in the first place.
 What follows is everything still open, and for the opcodes it says what kind
 of thing each one is even where the name is not known.
 
-**Opcodes.** The statement range is 242 of 256 assigned, the function range
+**Opcodes.** The statement range is 244 of 256 assigned, the function range
 127 of 128. What is left divides into three groups.
 
 - Nine values below `000a` are structural rather than statements. `0000`,
@@ -592,12 +600,37 @@ of thing each one is even where the name is not known.
   it is stopped. The rest of that range is almost certainly the same.
 - `0013` and `0014` behave exactly like `0002`, so they are not statements
   either.
-- That leaves three genuine unknowns. `0034` and `0035` come back from PDS as
-  a bare colon, which is a real rendering rather than a fallback: PDS writes
-  an empty line for an opcode it has no text for, which is what `008b` to
-  `008e` do. What statement writes only a colon is not known. `0099` is
-  refused by both QuickBASIC 4.5 and BASIC 7 PDS, bare and with operands
-  supplied, so it is not simply a later keyword.
+- `0034` and `0035` are line headers too, which is why PDS returns a bare
+  colon for them. See below.
+- That leaves one genuine unknown. `0099` is refused by both QuickBASIC 4.5
+  and BASIC 7 PDS, bare and with operands supplied, so it is not simply a
+  later keyword.
+
+### `0034` and `0035`, a label on a line already open
+
+These two had been filed as statements that write only a colon. They are not
+statements. `QB45BIN`, the converter QB64 Phoenix Edition ships, pairs them
+with the labelled line headers, and its rule table makes the relationship
+plain:
+
+```
+0x004  4,".{#newline}{#thaddr:0}{#label:2}"
+0x034  4,"newline::={#thaddr:0}{#label:2} "
+0x005  6,".{#newline}{#thaddr:0}{#label:2} {#indent:4}"
+0x035  6,"newline::={#thaddr:0}{#label:2} {#indent:4}"
+```
+
+Each pair carries the same fields at the same offsets and is the same length:
+a target address, a label reference, and for the six-byte form an indent word.
+What differs is that `0004` and `0005` begin a new output line and `0034` and
+`0035` do not. They are a label on a line that is already open, which is what
+a second label after a colon needs, and the trailing space in the rule is the
+whole of their text. That accounts for the bare colon PDS writes, and for
+their absence from the corpus: no program in 12,708 lines produces one.
+
+Read out of another project's table rather than established here, so it is
+their reading and not an experiment, but it fits every observation that put
+these two on the list in the first place.
 
 The one unassigned function code, `0108`, is not a missing function. It fits
 the type-conversion family, whose members have `08` as their low byte and a
@@ -617,10 +650,10 @@ the stack, PDS writes `1 TO 1`, and with none it writes the punctuation that
 would surround it. All three stay silent here, because reproducing what
 QuickBASIC 4.5 writes is the contract.
 
-None of the five opcodes still unidentified, and none of these three, appears
-anywhere in the corpus: 57 files and 12,708 lines, including programs written
-by other people. They are holes no real program reaches, which is why source
-alone could never have closed them.
+Neither the opcodes still unidentified nor these three appear anywhere in the
+corpus: 57 files and 12,708 lines, including programs written by other people.
+They are holes no real program reaches, which is why source alone could never
+have closed them.
 
 **Fields.**
 
@@ -715,8 +748,8 @@ What would help now, in order:
   checked.
 - **PDS-written files.** PDS reads 4.5 files correctly, but what it writes has
   not been looked at.
-- **Whatever produces `0034`, `0035` and `0099`.** Those three are the only
-  statement opcodes left whose nature is genuinely unknown.
+- **Whatever produces `0099`.** It is the only statement opcode left whose
+  nature is genuinely unknown.
 - **The last four example batches.** Five of the nine round-trip exactly and
   are in the corpus. The other four differ on twenty lines: two are the `LOCK`
   ambiguity described above, some are a name recorded in one letter case and

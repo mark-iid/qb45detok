@@ -60,17 +60,33 @@ The only way I had to read these files was to boot DOS, load each one into
 setup, and it has a nasty failure mode: pick the wrong format on the way out
 and you get a file that looks converted and isn't.
 
-Nothing existed that would do it directly. Every BASIC detokenizer I could find
-handles one of the other formats above. QuickBASIC 4.5 is not like any of them.
-It keeps identifiers in a hashed symbol table and refers to them by offset
-rather than storing names inline, and statements are stored in reverse Polish
-rather than as a flat token list.
+QuickBASIC 4.5 is not like the other formats listed above. It keeps identifiers
+in a hashed symbol table and refers to them by offset rather than storing names
+inline, and statements are stored in reverse Polish rather than as a flat token
+list, so the detokenizers written for GW-BASIC and its relatives do not read it.
 
-So I worked the format out by saving programs both ways and comparing the two
-sides. `docs/format.md` is what I found, written up properly: the layout, the
-symbol table, the opcode encodings, and the parts I still cannot explain. If
-you want to write your own reader, or port this to another language, start
-there.
+One other tool does. QB64 Phoenix Edition ships [QB45BIN], written by qarnos,
+which its IDE runs when it opens a 4.5 binary and which works from the command
+line too:
+
+```
+QB45BIN PROGRAM.BAS -o PROGRAM.TXT
+```
+
+I did not know about it when I started, and an earlier version of this file
+claimed nothing existed. That was wrong. Its rule table and mine were arrived
+at separately and they agree wherever both have an entry, which is worth more
+than either on its own; it also settles two opcodes I had down as unknown, and
+`docs/format.md` says which.
+
+What it does not do is write the format, and it does not come with a
+description of one. That is the gap this fills: conversion both ways, a library
+rather than a single shell command, and `docs/format.md`, which sets out the
+layout, the symbol table, the opcode encodings and the parts I still cannot
+explain. If you want to write your own reader, or port this to another
+language, start there.
+
+[QB45BIN]: https://github.com/QB64-Phoenix-Edition/QB64pe
 
 ## Writing the format
 
