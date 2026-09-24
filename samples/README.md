@@ -61,6 +61,7 @@ Then put the two in `corpus/bin/NAME.BAS` and `corpus/txt/NAME.BAS`.
 | `E11.BAS` | `PRINT` and `WRITE` punctuation to a file, and `STEP` on every graphics statement |
 | `E12.BAS` | nested `TYPE`s, `LSET` between records, string `CONST`, `OPEN` with no `FOR` clause |
 | `E13.BAS` | `DIM SHARED`, `STATIC` and `SHARED` inside a `SUB`, `ERASE`, `TAB`/`SPC` written to a file |
+| `INCL.BAS` + `INCL.BI` | `$INCLUDE`, with labelled and numbered lines in the included file |
 
 The corpus also holds five batches of the programming examples printed in the
 QuickBASIC 4.5 reference, pulled out of `QB45ADVR.HLP` with `qb45detok
@@ -82,6 +83,16 @@ version, and `RESERVED.BAS` is the same case reached deliberately.
 
 `TRAIL1`/`TRAIL2` and `EDIT1` are experiments rather than coverage. See the
 "Known unknowns" section of `docs/format.md` for what they answered.
+
+`INCL` is the same kind of thing and hasn't been run yet. Nothing in the corpus
+uses `$INCLUDE`, so five opcodes are placed in `docs/format.md` from two other
+projects' tables rather than from anything here: `0099` for the metacommand,
+`0002` and `0003` for a line that came from an included file, and `0034` and
+`0035` for an included line carrying a label. `INCL.BI` has to sit next to
+`INCL.BAS` in the same directory when QB loads it, or the include won't
+resolve. Save it both ways as above, then look for those five words. Running
+the program with F5 first is worth trying as a second case, since QB may only
+process the include when it compiles.
 
 All of these have been through QB and are in the corpus. None is expected to
 run usefully, and `SYSTEM.BAS` ends by raising an error on purpose. They only
