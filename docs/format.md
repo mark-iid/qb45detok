@@ -591,27 +591,39 @@ which is how the placement came to be testable in the first place.
 What follows is everything still open, and for the opcodes it says what kind
 of thing each one is even where the name is not known.
 
-**Opcodes.** The statement range is 244 of 256 assigned, the function range
+**Opcodes.** The statement range is 245 of 256 assigned, the function range
 127 of 128. What is left divides into three groups.
 
 - Nine values below `000a` are structural rather than statements. `0000`,
   `0001`, `0004` and `0005` are line headers the decoder has to read as such,
-  and `0002` sends QB into a loop when it is handed one, writing lines until
-  it is stopped. The rest of that range is almost certainly the same.
+  `0002` and `0003` are the two that mark an included line, and handing QB any
+  of them as a statement sends it into a loop, writing lines until it is
+  stopped. The rest of that range is almost certainly the same.
 - `0013` and `0014` behave exactly like `0002`, so they are not statements
   either.
-- `0034` and `0035` are line headers too, which is why PDS returns a bare
-  colon for them. See below.
-- That leaves one genuine unknown. `0099` is refused by both QuickBASIC 4.5
-  and BASIC 7 PDS, bare and with operands supplied, so it is not simply a
-  later keyword.
+- `0034`, `0035` and `0099` belong to `$INCLUDE`, which nothing in the corpus
+  uses. See below.
 
-### `0034` and `0035`, a label on a line already open
+### The `$INCLUDE` family
 
-These two had been filed as statements that write only a colon. They are not
-statements. `QB45BIN`, the converter QB64 Phoenix Edition ships, pairs them
-with the labelled line headers, and its rule table makes the relationship
-plain:
+Three opcodes sat on the unknown list for the same reason: no program in the
+corpus uses `$INCLUDE`, so none of them ever appears, and handing a bare one
+to QuickBASIC or to PDS produced a bare colon or a refusal. Two other readings
+of this format place them, and together they make one coherent group.
+
+| Opcode | What it is |
+|---|---|
+| `0002`, `0003` | line headers for a line that came from an included file |
+| `0034`, `0035` | the same, for an included line that carries a label |
+| `0099` | the `$INCLUDE` metacommand itself |
+
+`0099` takes a length-prefixed path and is written `$INCLUDE: 'NAME.BI`, the
+same payload shape as the comment opcode `0097` without its column word. That
+is from `Qb45Format.ts` in [jeredw/qbc]. `0034` and `0035` pair with the
+labelled line headers `0004` and `0005`, carrying the same fields at the same
+offsets and the same lengths; `QB45BIN`'s rule table shows the pairing and
+`Qb45Format.ts` decodes each pair with shared code, commenting that the higher
+two are "used in $INCLUDEd lines".
 
 ```
 0x004  4,".{#newline}{#thaddr:0}{#label:2}"
@@ -620,17 +632,19 @@ plain:
 0x035  6,"newline::={#thaddr:0}{#label:2} {#indent:4}"
 ```
 
-Each pair carries the same fields at the same offsets and is the same length:
-a target address, a label reference, and for the six-byte form an indent word.
-What differs is that `0004` and `0005` begin a new output line and `0034` and
-`0035` do not. They are a label on a line that is already open, which is what
-a second label after a colon needs, and the trailing space in the rule is the
-whole of their text. That accounts for the bare colon PDS writes, and for
-their absence from the corpus: no program in 12,708 lines produces one.
+Two things corroborate it here. `0099` sits immediately below `009a`, the
+`BEEP` that opens the alphabetical run through to `WRITE`, which is where
+something that is not a keyword belongs and nowhere a keyword could go. And it
+explains the refusals: `0099` wants a string payload, and it was offered a
+bare opcode and then stack operands, neither of which it can read.
 
-Read out of another project's table rather than established here, so it is
-their reading and not an experiment, but it fits every observation that put
-these two on the list in the first place.
+Not confirmed by experiment here. The check is a five-minute one for anyone
+with a DOS setup: save a program with an `$INCLUDE` in QuickBASIC 4.5, and a
+labelled line in the included file, then look for `0099` and `0034`. Until
+that is done this is two other projects' reading rather than a result, and
+`tokens.py` does not carry these three.
+
+[jeredw/qbc]: https://github.com/jeredw/qbc
 
 The one unassigned function code, `0108`, is not a missing function. It fits
 the type-conversion family, whose members have `08` as their low byte and a
@@ -748,8 +762,10 @@ What would help now, in order:
   checked.
 - **PDS-written files.** PDS reads 4.5 files correctly, but what it writes has
   not been looked at.
-- **Whatever produces `0099`.** It is the only statement opcode left whose
-  nature is genuinely unknown.
+- **Confirming the `$INCLUDE` family.** `0002`, `0003`, `0034`, `0035` and
+  `0099` are placed above on other projects' evidence and not on any run here,
+  and no statement opcode is unaccounted for once they are. One saved program
+  settles it.
 - **The last four example batches.** Five of the nine round-trip exactly and
   are in the corpus. The other four differ on twenty lines: two are the `LOCK`
   ambiguity described above, some are a name recorded in one letter case and
