@@ -48,18 +48,14 @@ _COMMENT = re.compile(r"^\s*('|REM\b)", re.I)
 #: whenever the default types change from one to the next.
 _DEFTYPE = re.compile(r"^\s*DEF(INT|LNG|SNG|DBL|STR)\b", re.I)
 
-#: Words that only BASIC 7 PDS has. Source using one of these cannot be
-#: written as a QuickBASIC 4.5 file, which is the only thing this writes.
-PDS_ONLY = (
-    "CURRENCY", "DEFCUR", "CCUR", "CVC", "MKC$", "CURDIR$", "DIR$", "CHDRIVE",
-    "SSEG", "SSEGADD", "BEGINTRANS", "CHECKPOINT", "COMMITTRANS", "ROLLBACK",
-    "SAVEPOINT", "CREATEINDEX", "DELETEINDEX", "DELETETABLE", "SETINDEX",
-    "GETINDEX$", "MOVEFIRST", "MOVELAST", "MOVENEXT", "MOVEPREVIOUS",
-    "SEEKEQ", "SEEKGE", "SEEKGT", "RETRIEVE",
-)
-_PDS_WORD = re.compile(
-    r"(?<![\w.$])(" + "|".join(w.replace("$", r"\$") for w in PDS_ONLY)
-    + r")(?![\w.])", re.I)
+#: The only thing PDS source can say that a QuickBASIC 4.5 file would store
+#: as something else. PDS numbers CURRENCY at type code 5 and 4.5 numbers
+#: STRING there, so a declared CURRENCY written into a 4.5 file comes back as
+#: a string. Everything else PDS adds either parses as an ordinary call, which
+#: is faithful, or fails to parse and is kept as text, which is also faithful.
+_DECLARED_CURRENCY = re.compile(r"(?<![\w.])AS\s+CURRENCY(?![\w.])", re.I)
+_DEFCUR = re.compile(r"(?<![\w.])DEFCUR(?![\w.])", re.I)
+_TYPE_CURRENCY = re.compile(r"(?<![\w.])TYPE\s+CURRENCY(?![\w.])", re.I)
 
 #: A metacommand comment, which is not an ordinary comment: it belongs to
 #: the section it was written in.
@@ -162,14 +158,27 @@ def record_variables(text: str) -> Set[str]:
 
 
 def pds_words(text: str) -> Set[str]:
-    """PDS-only words used as code, ignoring comments and string literals."""
-    found: Set[str] = set()
+    """What in this source a QuickBASIC 4.5 file could not hold.
+
+    Only the currency type qualifies. A word like ``DIR$`` is no evidence at
+    all: ``SubDir$`` contains it, prose in an untokenized line can contain it,
+    and a 4.5 program is perfectly entitled to define a function of that name,
+    all three of which are in the corpus.
+    """
+    code = []
     for line in text.splitlines():
         body = line.split("'", 1)[0]
         body = re.sub(r'"[^"]*"', '""', body)
         if re.match(r"\s*REM\b", body, re.I):
             continue
-        found.update(m.group(1).upper() for m in _PDS_WORD.finditer(body))
+        code.append(body)
+    joined = "\n".join(code)
+    found: Set[str] = set()
+    if _DEFCUR.search(joined):
+        found.add("DEFCUR")
+    # A program that declares its own TYPE CURRENCY means its own thing by it.
+    if _DECLARED_CURRENCY.search(joined) and not _TYPE_CURRENCY.search(joined):
+        found.add("AS CURRENCY")
     return found
 
 

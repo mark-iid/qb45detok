@@ -209,6 +209,45 @@ financial family, the date and time family, the whole of `FORMAT`, and the
 far-string helpers all tokenize as ordinary calls. No keyword in the index is
 now unaccounted for.
 
+## Formatting
+
+Every other formatter has to decide what the house style is. This one doesn't:
+QuickBASIC reformatted a program as it read it, and the rules it used are the
+ones the renderer already reproduces. So the way to format a file is to hand it
+to the tokenizer and read it back.
+
+```
+qb45detok fmt PROGRAM.BAS            # to stdout
+qb45detok fmt PROGRAM.BAS --diff     # what it would change
+qb45detok fmt PROGRAM.BAS --write    # rewrite it in place
+qb45detok fmt PROGRAM.BAS --check    # say nothing, exit non-zero if it would
+```
+
+```
+-dim shared total as integer
+-for i=1 to 10
+-if i mod 2=0 then print i;"even"
++DIM SHARED total AS INTEGER
++FOR i = 1 TO 10
++IF i MOD 2 = 0 THEN PRINT i; "even"
+```
+
+Keywords go to upper case, operators and commas get their spacing, and every
+mention of a name takes the spelling it was first given. What it leaves alone
+matters as much: QuickBASIC never re-indented anyone's code and neither does
+this, a comment stays in the column it sat in, and a line it can't read is
+passed through untouched rather than mangled.
+
+Two things I checked rather than assumed. It settles, so running it twice
+changes nothing: 57 of my 58 corpus files, the exception being the one whose
+comment ends in spaces. And QuickBASIC's own text output is already a fixed
+point for 50 of them, which is the closest thing to a proof that the rules
+match.
+
+Procedures stay in the order you wrote them. QB's own Save As Text sorts them
+by name, and `--qb-order` does too, but a formatter that moves code around is a
+surprise, so it isn't the default.
+
 ## Reading old data files
 
 Random access files written by these programs hold numbers in Microsoft Binary
@@ -237,6 +276,7 @@ qb45detok detok PROGRAM.BAS              # write source to stdout
 qb45detok detok PROGRAM.BAS -o OUT.BAS   # write a CRLF text file
 qb45detok tok PROGRAM.TXT -o OUT.BAS     # and back again
 qb45detok lint PROGRAM.BAS               # what will not port to QB64
+qb45detok fmt PROGRAM.BAS --write        # format it the way QuickBASIC does
 ```
 
 If you have a directory of old files and don't know what's in it, start here:
@@ -337,7 +377,7 @@ pytest
 ```
 
 Without a corpus the format-level tests still run and the rest skip, which is
-what happens in CI: 192 of them run there against 1,561 here, since most of
+what happens in CI: 212 of them run there against 1,634 here, since most of
 the suite is one test per corpus file.
 
 ## License

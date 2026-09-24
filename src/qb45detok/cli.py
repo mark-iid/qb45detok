@@ -10,6 +10,7 @@ from typing import List, Optional
 from .decode import decode_file, decode_section
 from .render import Renderer
 from .quickhelp import HelpFile, QuickHelpError
+from .fmt import diff, format_source, would_change
 from .lint import check, report
 from .tokenize import PdsSource, tokenize
 from .triage import scan
@@ -238,6 +239,34 @@ def cmd_tok(args) -> int:
     return 0
 
 
+def cmd_fmt(args) -> int:
+    """Format source the way QuickBASIC formats it."""
+    path = Path(args.file)
+    text = path.read_text(encoding="latin-1")
+    formatted = format_source(text, path.parent, args.qb_order)
+    changed = would_change(text, formatted)
+    if args.check:
+        if changed:
+            print(f"qb45detok: {path} is not formatted", file=sys.stderr)
+        return 1 if changed else 0
+    if args.diff:
+        for line in diff(text.splitlines(), formatted, str(path)):
+            print(line)
+        return 1 if changed else 0
+    if args.write:
+        if changed:
+            # Keep whatever line endings the file already had.
+            ending = "\r\n" if "\r\n" in text else "\n"
+            with open(path, "w", encoding="latin-1", newline="") as fh:
+                for line in formatted:
+                    fh.write(line + ending)
+            print(f"formatted {path}")
+        return 0
+    for line in formatted:
+        print(line)
+    return 0
+
+
 def cmd_lint(args) -> int:
     """Report what in a program will not survive a port to QB64."""
     path = Path(args.file)
@@ -315,6 +344,18 @@ def build_parser() -> argparse.ArgumentParser:
     tk.add_argument("file")
     tk.add_argument("-o", "--output", help="write to this file instead of stdout")
     tk.set_defaults(func=cmd_tok)
+
+    fm = sub.add_parser("fmt", help="format source the way QuickBASIC does")
+    fm.add_argument("file")
+    fm.add_argument("-w", "--write", action="store_true",
+                    help="rewrite the file in place")
+    fm.add_argument("--check", action="store_true",
+                    help="say nothing, exit non-zero if it would change")
+    fm.add_argument("--diff", action="store_true",
+                    help="show what would change")
+    fm.add_argument("--qb-order", action="store_true",
+                    help="sort procedures by name, as QB's own Save As Text does")
+    fm.set_defaults(func=cmd_fmt)
 
     li = sub.add_parser("lint", help="what will not port to QB64")
     li.add_argument("file")

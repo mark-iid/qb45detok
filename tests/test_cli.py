@@ -69,3 +69,13 @@ def test_lint_exits_non_zero_when_there_is_something_to_fix(capsys):
     assert main(["lint", str(CORPUS_BIN / "COVER2.BAS")]) == 1
     out = capsys.readouterr().out
     assert "CALL ABSOLUTE" in out and "CALLS" in out
+
+
+def test_fmt_check_exits_non_zero_on_unformatted_source(tmp_path, capsys):
+    messy = tmp_path / "messy.BAS"
+    messy.write_text("print 1\n", encoding="latin-1")
+    assert main(["fmt", str(messy), "--check"]) == 1
+    assert main(["fmt", str(messy), "--write"]) == 0
+    assert messy.read_text(encoding="latin-1").startswith("PRINT 1")
+    capsys.readouterr()
+    assert main(["fmt", str(messy), "--check"]) == 0

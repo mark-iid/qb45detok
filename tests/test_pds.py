@@ -127,12 +127,20 @@ def test_the_writer_refuses_pds_source_rather_than_downgrading_it():
         tokenize("DIM Money AS CURRENCY\nEND")
 
 
-def test_a_pds_word_in_a_string_or_comment_is_not_source():
+def test_only_a_declared_currency_stops_the_writer():
+    """A word is no evidence: the corpus has SubDir$, prose, and a DIR$ of
+    its own, and all three used to be refused as PDS."""
     from qb45detok.tokenize import pds_words
-    assert pds_words('PRINT "ROLLBACK"') == set()
-    assert pds_words("X = 1 ' ROLLBACK and CHDRIVE") == set()
-    assert pds_words("REM CURRENCY") == set()
-    assert pds_words("ROLLBACK") == {"ROLLBACK"}
+    assert pds_words("DIM M AS CURRENCY") == {"AS CURRENCY"}
+    assert pds_words("DEFCUR C") == {"DEFCUR"}
+    # ...but not when the program declares a CURRENCY of its own.
+    assert pds_words("TYPE CURRENCY\n X AS INTEGER\nEND TYPE\n"
+                     "DIM M AS CURRENCY") == set()
+    # ...and never from a comment, a string, or a name that contains one.
+    assert pds_words('PRINT "AS CURRENCY"') == set()
+    assert pds_words("X = 1 ' DEFCUR") == set()
+    assert pds_words("DECLARE SUB P (SubDir$)") == set()
+    assert pds_words("PRINT DIR$(F)") == set()
 
 
 @requires_pds

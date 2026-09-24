@@ -1123,16 +1123,19 @@ class Renderer:
             return (self._indent(line.indent)
                     + f"' <qb45detok: {type(exc).__name__}: {exc}>")
 
-    def file(self, sections: List[DecodedSection]) -> List[str]:
+    def file(self, sections: List[DecodedSection],
+             sort: bool = True) -> List[str]:
         """Every section in the order QB writes them out.
 
-        The module text comes first, then the procedures sorted by name --
-        which is the order QB's own Save As Text produces, not the order the
-        sections sit in the file.
+        The module text comes first, then the procedures sorted by name,
+        which is the order QB's own Save As Text produces rather than the
+        order the sections sit in the file. ``sort=False`` keeps the file's
+        own order instead, which is what a formatter wants.
         """
         modules = [d for d in sections if d.section.is_module]
-        procs = sorted((d for d in sections if not d.section.is_module),
-                       key=lambda d: d.section.name.lower())
+        procs = [d for d in sections if not d.section.is_module]
+        if sort:
+            procs = sorted(procs, key=lambda d: d.section.name.lower())
         out: List[str] = []
         # QB writes a DEF<type> line whenever the default type changes from
         # one section to the next. A procedure with no DEFtype record of its
