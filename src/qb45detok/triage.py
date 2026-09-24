@@ -20,12 +20,19 @@ from typing import Iterable, List, Optional
 #: answer is "use that other tool" rather than a wrong conversion.
 SIGNATURES = {
     0xFC: ("QuickBASIC 4.5", "qb45detok"),
-    0xFD: ("QuickBASIC 4.0 or BASIC 7 PDS", "untested here"),
+    0xFD: ("QuickBASIC 4.0", "untested here"),
     0xFE: ("QuickBASIC 3 or earlier", "untested here"),
     0xFF: ("GW-BASIC, BASICA or MSX-BASIC", "bascat, gwbasic-decoder"),
     0xF9: ("older Microsoft BASIC", "decode_ms_basic.py"),
     0xF1: ("older Microsoft BASIC", "decode_ms_basic.py"),
     0xF3: ("older Microsoft BASIC", "decode_ms_basic.py"),
+}
+
+#: A leading 0xFC says the file is QuickBASIC's own tokenized format, and the
+#: byte after it says which product wrote it. 0x01 has never been seen.
+VERSIONS = {
+    0x00: ("QuickBASIC 4.5", "qb45detok"),
+    0x02: ("BASIC 7 PDS", "qb45detok"),
 }
 
 #: A protected file is tokenized and then encrypted; the tokenizer is the same
@@ -73,6 +80,9 @@ def classify(path: Path) -> Finding:
         return Finding(path, "empty", "none")
 
     first = head[0]
+    if first == 0xFC and len(head) > 1 and head[1] in VERSIONS:
+        kind, tool = VERSIONS[head[1]]
+        return Finding(path, kind, tool, first)
     if first in SIGNATURES:
         kind, tool = SIGNATURES[first]
         detail = ""

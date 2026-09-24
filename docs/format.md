@@ -591,6 +591,66 @@ practice: QuickBASIC 4.5 rebuilds its own lookup when it loads a program, and
 four files written here have been loaded by QB and saved back as text
 unchanged. See the symbol table section.
 
+## BASIC 7 PDS
+
+PDS 7.1 writes the same format with four differences. Its editor, `QBX.EXE`,
+calls it Fast Load and Save in the same Save As dialog 4.5 does, and the first
+entry in that dialog's Format control is the binary one.
+
+Byte 1 says which product wrote the file: `00` for QuickBASIC 4.5 and `02` for
+PDS. QB64's own converter reads the first word instead and calls them 252 and
+764, which is the same thing. `01` has never been seen and QuickBASIC 4.0 is
+the obvious candidate, untested.
+
+| | QuickBASIC 4.5 | BASIC 7 PDS |
+|---|---|---|
+| byte 1 | `00` | `02` |
+| bucket array | `0x1c` | `0x1d` |
+| free reference | `0x6e` | `0x6f` |
+| name table | `0x72` | `0x73` |
+| reference base | `0x1c` | `0x1d` |
+| signature parameter | 6 bytes | 8 bytes |
+
+**One extra byte in the header.** The run at offset `0x0a` reads `06 00` then
+`01 02 03 04 05 08 10 10` in 4.5 and `07 00` then `01 02 03 04 06 05 08 10 10`
+in PDS, one longer. Everything after it moves up by one, which is the whole of
+the layout difference.
+
+**CURRENCY takes type code 5.** PDS adds the type and slots it in before
+`STRING`, which moves to 6. Every table keyed by a type code moves with it, so
+a 4.5 reader turns `AS CURRENCY` into `AS STRING` and `DEFCUR` into `DEFSTR`
+rather than failing. This is the difference worth knowing about, because it is
+wrong quietly.
+
+**Two more bytes per signature parameter.** A parameter is `[ref][mode][type]`
+in 4.5 and `[ref][mode][type][0000]` in PDS. The extra word is zero in every
+file seen and what it is for is not known.
+
+**Opcodes of its own.** Read off `samples/PDSKEY.BAS`, written to use the
+keywords PDS adds and saved through QBX:
+
+| Opcode | Keyword |
+|---|---|
+| `0181` | `CURDIR$` |
+| `0184` | `DIR$` |
+| `0187` | `CVC` |
+| `0189` | `MKC$` |
+| `018b` | `SSEG` |
+| `018c` | `SSEGADD` |
+| `1508` | `CCUR` |
+| `017f` | `CHDRIVE`, which 4.5 keeps a slot for and will not print |
+
+`1508` corrects something this document used to say. It fits the conversion
+family, low byte `08` and a high byte one more than a multiple of four, and
+the note here called index 5 an unused slot alongside `0108`. In PDS index 5
+is `CURRENCY`, so `1508` is `CCUR`. Only `0108`, index 0, is unused.
+
+The block from `0181` upward is contiguous and the gaps in it are PDS keywords
+not yet identified. PDS adds about fifty over 4.5, so most of them are still
+open. `STRINGADDRESS`, `STRINGLENGTH`, `STRINGASSIGN` and `STRINGRELEASE` are
+not among them: QBX tokenized those as ordinary array references and calls,
+so they are library routines rather than keywords.
+
 ## Known unknowns
 
 What follows is everything still open, and for the opcodes it says what kind
@@ -679,8 +739,10 @@ that the other two are "used in $INCLUDEd lines".
 The one unassigned function code, `0108`, isn't a missing function. It fits
 the type-conversion family, whose members have `08` as their low byte and a
 high byte one more than a multiple of four; the high byte indexes the target
-type, 1 `CINT` through 4 `CDBL`. `0108` is index 0, meaning no type, and
-`1508` is index 5, `STRING`. Both are unused slots.
+type, 1 `CINT` through 4 `CDBL`. `0108` is index 0, meaning no type, and is
+unused. Index 5, `1508`, is not: it is `CCUR` in BASIC 7 PDS, which is what
+told us the family is numbered by the type table rather than by anything
+4.5-specific.
 
 Ten opcodes are identified but produce no display text at all: `0017`, the
 dotted name marker, `004b`, `0024`, `007b`, `007c`, `0098` and `008b` to
@@ -797,8 +859,10 @@ What would help now, in order:
   different variant is repeated from other projects' documentation, not
   tested, which is the one place this document passes on something it hasn't
   checked.
-- **PDS-written files.** PDS reads 4.5 files correctly, but what it writes
-  hasn't been looked at.
+- **The rest of the PDS opcodes.** Seven are named and PDS adds about fifty
+  keywords, so the `0181` block is mostly unmapped. The method is the one that
+  found these: write a program that uses them, save it through QBX, read the
+  opcodes off. The ISAM verbs need the ISAM library loaded to tokenize.
 - **Byte-identical output from the tokenizer.** `INCL.BAS` comes back byte for
   byte apart from the hash fields, but it is a small program. Across the corpus
   most files still differ in length, mostly in how the name table is ordered

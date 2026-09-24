@@ -36,6 +36,54 @@ BUCKETS_END = BUCKETS_OFF + BUCKET_COUNT * 2  # 0x6e
 FREE_REF_OFF = 0x6E  # ref one past the last name-table entry
 NAMES_OFF = 0x72  # == REF_BASE + 0x56
 CODE_REF_OFF = 0x1A
+
+
+@dataclass(frozen=True)
+class Layout:
+    """Where the fixed parts of a file sit, which the version byte decides.
+
+    BASIC 7 PDS writes one extra byte into the header and everything after it
+    moves up by one. Nothing else about the layout changes, so the reader
+    takes these from here rather than from module constants.
+    """
+
+    name: str
+    version: int          #: byte 1, which says which product wrote the file
+    ref_base: int
+    buckets_off: int
+    free_ref_off: int
+    names_off: int
+    code_ref_off: int
+    #: Type codes. PDS slots CURRENCY in at 5, which moves STRING to 6 and
+    #: shifts every table keyed by a type code with it.
+    type_keywords: Dict[int, str] = field(default_factory=dict)
+    param_types: Dict[int, str] = field(default_factory=dict)
+    deftype_keywords: Dict[int, str] = field(default_factory=dict)
+    #: Opcodes this product has and the other does not.
+    extra_ops: Dict[int, object] = field(default_factory=dict)
+
+    @property
+    def buckets_end(self) -> int:
+        return self.buckets_off + BUCKET_COUNT * 2
+
+
+_QB45_TYPES = {1: "INTEGER", 2: "LONG", 3: "SINGLE", 4: "DOUBLE", 5: "STRING"}
+_PDS_TYPES = {1: "INTEGER", 2: "LONG", 3: "SINGLE", 4: "DOUBLE",
+              5: "CURRENCY", 6: "STRING"}
+_QB45_SUFFIX = {1: "%", 2: "&", 3: "!", 4: "#", 5: "$"}
+_PDS_SUFFIX = {1: "%", 2: "&", 3: "!", 4: "#", 5: "@", 6: "$"}
+_QB45_DEF = {1: "DEFINT", 2: "DEFLNG", 3: "DEFSNG", 4: "DEFDBL", 5: "DEFSTR"}
+_PDS_DEF = {1: "DEFINT", 2: "DEFLNG", 3: "DEFSNG", 4: "DEFDBL",
+            5: "DEFCUR", 6: "DEFSTR"}
+
+QB45 = Layout("QuickBASIC 4.5", 0x00, 0x1C, 0x1C, 0x6E, 0x72, 0x1A,
+              _QB45_TYPES, _QB45_SUFFIX, _QB45_DEF)
+PDS71 = Layout("BASIC 7 PDS", 0x02, 0x1D, 0x1D, 0x6F, 0x73, 0x1B,
+               _PDS_TYPES, _PDS_SUFFIX, _PDS_DEF)
+
+#: By the version byte at offset 1. 0x01 has never been seen; QuickBASIC 4.0
+#: is the obvious candidate and remains untested.
+LAYOUTS = {layout.version: layout for layout in (QB45, PDS71)}
 #: Flags byte: 0x80 indent with tabs, 0x40 edited in the QB editor.
 FLAGS_OFF = 0x13
 
@@ -165,9 +213,10 @@ def _u32(d: bytes, o: int) -> int:
 
 @dataclass
 class BinFile:
-    """A parsed QuickBASIC 4.5 binary ``.BAS`` file."""
+    """A parsed QuickBASIC binary ``.BAS`` file, 4.5 or BASIC 7 PDS."""
 
     data: bytes
+    layout: Layout = QB45  #: which product wrote it, and where things sit
     buckets: List[int] = field(default_factory=list)
     names: Dict[int, NameEntry] = field(default_factory=dict)
     sections: List[Section] = field(default_factory=list)
@@ -182,13 +231,22 @@ class BinFile:
             raise ParseError("empty file")
         if data[0] != MAGIC:
             raise ParseError(
-                f"not a QuickBASIC 4.5 binary file: first byte is {data[0]:#04x}, expected {MAGIC:#04x}"
+                f"not a QuickBASIC binary file: first byte is {data[0]:#04x}, expected {MAGIC:#04x}"
             )
-        if len(data) < NAMES_OFF:
-            raise ParseError(f"truncated: {len(data)} bytes, header alone needs {NAMES_OFF}")
+        layout = LAYOUTS.get(data[1] if len(data) > 1 else 0)
+        if layout is None:
+            raise ParseError(
+                f"unknown variant: byte 1 is {data[1]:#04x}; "
+                f"known are {', '.join(f'{v:#04x}' for v in sorted(LAYOUTS))}"
+            )
+        if len(data) < layout.names_off:
+            raise ParseError(f"truncated: {len(data)} bytes, header alone "
+                             f"needs {layout.names_off}")
 
         self = cls(data=data)
-        self.buckets = [_u16(data, BUCKETS_OFF + 2 * i) for i in range(BUCKET_COUNT)]
+        self.layout = layout
+        self.buckets = [_u16(data, layout.buckets_off + 2 * i)
+                        for i in range(BUCKET_COUNT)]
         self._parse_names()
         self._parse_sections()
         return self
@@ -200,18 +258,18 @@ class BinFile:
 
     def _parse_names(self) -> None:
         d = self.data
-        end = self.free_ref + REF_BASE
-        if not NAMES_OFF <= end <= len(d):
+        end = self.free_ref + self.layout.ref_base
+        if not self.layout.names_off <= end <= len(d):
             raise ParseError(f"name table end {end:#x} outside file of {len(d):#x} bytes")
-        off = NAMES_OFF
+        off = self.layout.names_off
         while off < end:
             if off + 4 > end:
                 raise ParseError(f"name entry header at {off:#x} runs past table end {end:#x}")
             link, flags, length = _u16(d, off), d[off + 2], d[off + 3]
             if off + 4 + length > end:
                 raise ParseError(f"name entry at {off:#x} claims {length} bytes, past {end:#x}")
-            self.names[off - REF_BASE] = NameEntry(
-                ref=off - REF_BASE,
+            self.names[off - self.layout.ref_base] = NameEntry(
+                ref=off - self.layout.ref_base,
                 offset=off,
                 link=link,
                 flags=flags,
@@ -229,8 +287,8 @@ class BinFile:
         signature -- in TORUS most trailers do not have the run at all.
         """
         d = self.data
-        cursor = self.code_ref + REF_BASE
-        if not NAMES_OFF <= cursor < len(d):
+        cursor = self.code_ref + self.layout.ref_base
+        if not self.layout.names_off <= cursor < len(d):
             raise ParseError(f"code offset {cursor:#x} outside file of {len(d):#x} bytes")
 
         while cursor + 2 <= len(d):
@@ -303,12 +361,12 @@ class BinFile:
 
     @property
     def code_ref(self) -> int:
-        return _u16(self.data, CODE_REF_OFF)
+        return _u16(self.data, self.layout.code_ref_off)
 
     @property
     def free_ref(self) -> int:
         """Ref one past the last name-table entry."""
-        return _u16(self.data, FREE_REF_OFF)
+        return _u16(self.data, self.layout.free_ref_off)
 
     @property
     def uses_tabs(self) -> bool:

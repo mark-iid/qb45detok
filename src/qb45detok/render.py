@@ -154,6 +154,10 @@ class Renderer:
 
     def __init__(self, bf: BinFile):
         self.bf = bf
+        # The type tables belong to the product that wrote the file: PDS
+        # numbers CURRENCY at 5 and everything after it moves up one.
+        self.types = bf.layout.type_keywords or tokens.TYPE_KEYWORDS
+        self.deftypes = bf.layout.deftype_keywords or self.DEFTYPE_KEYWORDS
         self.section_kind: Optional[int] = None
         self.section_is_function = False
         self.in_module = True   # module text: EXIT there means EXIT DEF
@@ -423,7 +427,7 @@ class Renderer:
             elif mn == "DEFTYPE":
                 emit(self._deftype(ins))
             elif mn == "AS_TYPE":
-                declared_type = tokens.TYPE_KEYWORDS.get(ins.operands[0], "ANY")
+                declared_type = self.types.get(ins.operands[0], "ANY")
                 declared_col = ins.operands[1]
             elif mn == "AS_USER_TYPE":
                 declared_type = self.name(ins.operands[0])
@@ -1069,7 +1073,7 @@ class Renderer:
     def _deftype(self, ins: Instr) -> str:
         """``DEFINT A-C`` and friends, read out of the two letter masks."""
         _, tail, head = ins.operands
-        keyword = self.DEFTYPE_KEYWORDS.get(tail & 0x3F, "DEFINT")
+        keyword = self.deftypes.get(tail & 0x3F, "DEFINT")
         letters = [i for i in range(16) if head >> (15 - i) & 1]
         letters += [16 + i for i in range(10) if tail >> (15 - i) & 1]
         return f"{keyword} {self._ranges(letters)}"
@@ -1089,7 +1093,7 @@ class Renderer:
     def _type_name(self, code: int) -> str:
         if code == 0:
             return "ANY"
-        return tokens.TYPE_KEYWORDS.get(code) or self.name(code)
+        return self.types.get(code) or self.name(code)
 
     # -- whole sections --------------------------------------------------
 
@@ -1175,7 +1179,7 @@ class Renderer:
         changed = [i for i in range(26) if before[i] != after[i]]
         for code in sorted({after[i] for i in changed}):
             letters = [i for i in changed if after[i] == code]
-            keyword = self.DEFTYPE_KEYWORDS.get(code, "DEFSNG")
+            keyword = self.deftypes.get(code, "DEFSNG")
             out.append(f"{keyword} {self._ranges(letters)}")
         return out
 

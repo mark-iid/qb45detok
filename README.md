@@ -4,8 +4,9 @@
 [![python](https://img.shields.io/badge/python-3.9%20to%203.13-blue)](https://github.com/mark-iid/qb45detok)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-**Convert Microsoft QuickBASIC 4.5 binary `.BAS` files back to readable BASIC
-source text.** No DOS, no DOSBox, no copy of `QB.EXE` needed.
+**Convert Microsoft QuickBASIC binary `.BAS` files back to readable BASIC
+source text.** QuickBASIC 4.5 and BASIC 7 PDS. No DOS, no DOSBox, no copy of
+`QB.EXE` needed.
 
 If you have old QuickBASIC or QB45 programs that show up as binary garbage in a
 text editor, and the file starts with byte `0xFC`, this is the tool for them.
@@ -14,9 +15,11 @@ text editor, and the file starts with byte `0xFC`, this is the tool for them.
 qb45detok detok OLDPROG.BAS -o OLDPROG.TXT
 ```
 
-QuickBASIC could save a program either as plain text or in its own tokenized
-binary format. The binary format is smaller and loads faster, so a lot of code
-from the era ended up stored that way, including a pile of my own from 1994.
+QuickBASIC could save a program either as plain text or in its own binary
+format. The Save As dialog calls it **Fast Load and Save**, and you will also
+see it called the binary, compressed or tokenized format; they are all the same
+thing. It is smaller and loads faster, so a lot of code from the era ended up
+stored that way, including a pile of my own from 1994.
 
 ## Is this the right tool for your file?
 
@@ -27,22 +30,25 @@ compatible. Check the first byte of the file:
 head -c 1 OLDPROG.BAS | od -An -tx1
 ```
 
-| First byte | Format | Use |
+| First bytes | Format | Use |
 |---|---|---|
-| `fc` | QuickBASIC 4.5 | **this tool** |
+| `fc 00` | QuickBASIC 4.5 | **this tool** |
+| `fc 02` | BASIC 7 PDS, saved by QBX | **this tool** |
 | `ff` | GW-BASIC, BASICA, or MSX-BASIC | [bascat], [gwbasic-decoder], [basbinizer] |
 | `f9`, `f1`, `f3` | older Microsoft BASIC | [decode_ms_basic.py] |
 | printable text | already ASCII | nothing to do |
+
+The byte after `fc` says which product wrote the file. `qb45detok triage` reads
+it for you.
 
 Only the `fc` row is something I've verified myself, across fifty-eight files.
 The rest is from those projects' own documentation, and is here so you don't
 waste time on the wrong tool, as I did.
 
-A note on versions. I've only tested this against QuickBASIC 4.5. QuickBASIC
-4.0 and the later PDS / BASIC 7.x releases wrote their own variants, and QBasic
-1.1 (the cut-down one bundled with MS-DOS 5 and 6) saves plain text only, so its
-files need nothing. If you have a `0xFC` file from something other than 4.5 and
-it doesn't decode, that's worth reporting.
+A note on versions. QuickBASIC 4.5 and BASIC 7 PDS are both read and both
+tested. QuickBASIC 4.0 wrote its own variant and I have no 4.0 files, so that
+one is untested. QBasic 1.1 (the cut-down one bundled with MS-DOS 5 and 6)
+saves plain text only, so its files need nothing.
 
 If you're trying to decompile a QuickBASIC `.EXE` rather than read a `.BAS`,
 that's a different problem: see [qbasic-reversing-notes].
@@ -166,6 +172,33 @@ two different opcodes. `CALL ABSOLUTE` and `CALL INTERRUPT` are caught by the
 name they call, since they're routines in `QB.QLB` rather than keywords.
 
 Across my corpus, 39 of the 58 programs need no changes at all.
+
+## BASIC 7 PDS
+
+PDS wrote a variant of the same format and nothing else reads it. QB64 refuses
+it outright ("QBX 7.1 binary format not supported"), and the only advice I can
+find on the usenet and forum threads where people ask is to find someone who
+still has PDS installed and have them resave the files. This reads them
+directly.
+
+```
+qb45detok detok OLDPROG.BAS      # it works out which product wrote the file
+```
+
+Four differences, all of them small, and `docs/format.md` has the detail:
+
+- one extra byte in the header, which moves everything after it up by one
+- `CURRENCY` takes type code 5, which pushes `STRING` to 6. This is the one
+  that quietly changes meaning rather than failing, since a 4.5 reader turns
+  `AS CURRENCY` into `AS STRING`
+- two more bytes per parameter in a procedure signature
+- a block of opcodes of its own for the keywords PDS adds
+
+The opcode block is only partly mapped. Seven are named, read off a program
+written to use them: `CURDIR$`, `DIR$`, `CVC`, `MKC$`, `SSEG`, `SSEGADD` and
+`CCUR`, plus `CHDRIVE`, which 4.5 keeps a slot for and will not print. PDS adds
+about fifty keywords over 4.5, so there are more to find, and the gaps in the
+`0181` block say roughly where they are.
 
 ## Reading old data files
 

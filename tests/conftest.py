@@ -9,6 +9,8 @@ sys.path.insert(0, str(ROOT / "src"))
 CORPUS_BIN = ROOT / "corpus" / "bin"
 CORPUS_TXT = ROOT / "corpus" / "txt"
 SYNTHETIC = ROOT / "corpus" / "synthetic"
+CORPUS_PDS_BIN = ROOT / "corpus" / "pds" / "bin"
+CORPUS_PDS_TXT = ROOT / "corpus" / "pds" / "txt"
 
 #: Every matched pair in the corpus, if one is present. The corpus is a set of
 #: programs saved twice by QB 4.5 -- once tokenized, once as text -- and is not
@@ -17,6 +19,13 @@ CORPUS_AVAILABLE = CORPUS_BIN.is_dir() and any(CORPUS_BIN.glob("*.BAS"))
 NAMES = sorted(p.name for p in CORPUS_BIN.glob("*.BAS")) if CORPUS_AVAILABLE else []
 requires_corpus = pytest.mark.skipif(
     not CORPUS_AVAILABLE, reason="no corpus in corpus/bin and corpus/txt"
+)
+
+#: The same idea for BASIC 7 PDS, saved through QBX rather than QB 4.5.
+PDS_AVAILABLE = CORPUS_PDS_BIN.is_dir() and any(CORPUS_PDS_BIN.glob("*.BAS"))
+PDS_NAMES = sorted(p.name for p in CORPUS_PDS_BIN.glob("*.BAS")) if PDS_AVAILABLE else []
+requires_pds = pytest.mark.skipif(
+    not PDS_AVAILABLE, reason="no PDS corpus in corpus/pds"
 )
 
 import re

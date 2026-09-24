@@ -46,7 +46,7 @@ def test_bad_file_reports_cleanly(capsys, tmp_path):
     junk = tmp_path / "junk.BAS"
     junk.write_bytes(b"PRINT 1\r\n")
     assert main(["dump", str(junk)]) == 1
-    assert "not a QuickBASIC 4.5 binary file" in capsys.readouterr().err
+    assert "not a QuickBASIC binary file" in capsys.readouterr().err
 
 
 def test_missing_file_reports_cleanly(capsys):

@@ -14,7 +14,7 @@ from qb45detok.render import format_double, format_single
 
 
 def test_rejects_a_non_qb_file():
-    with pytest.raises(ParseError, match="not a QuickBASIC 4.5 binary file"):
+    with pytest.raises(ParseError, match="not a QuickBASIC binary file"):
         BinFile.parse(b"' just some ASCII BASIC\r\nPRINT 1\r\n")
 
 

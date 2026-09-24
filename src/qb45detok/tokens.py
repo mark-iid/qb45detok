@@ -76,6 +76,24 @@ REM = 0x0097
 #: ``$INCLUDE``.
 RAW_TEXT_OPS = frozenset({0x00E3, 0x0099})
 
+#: Opcodes BASIC 7 PDS has and QuickBASIC 4.5 does not. Read off a program
+#: written to use them and saved through QBX; the block from 0181 upward is
+#: contiguous, so the gaps in it are PDS keywords not yet identified.
+PDS_OPS = {
+    0x0181: _op(0x0181, "CURDIR$", (), 0, "CURDIR$", "func"),
+    0x0184: _op(0x0184, "DIR$", (), 1, "DIR$", "func"),
+    0x0187: _op(0x0187, "CVC", (), 1, "CVC", "func"),
+    0x0189: _op(0x0189, "MKC$", (), 1, "MKC$", "func"),
+    0x018B: _op(0x018B, "SSEG", (), 1, "SSEG", "func"),
+    0x018C: _op(0x018C, "SSEGADD", (), 1, "SSEGADD", "func"),
+    #: The conversion family's index 5, which 4.5 leaves unused.
+    0x1508: _op(0x1508, "CCUR", (), 1, "CCUR", "func"),
+    #: 4.5 keeps the slot and refuses to print it, so the base table has it
+    #: as a silent marker. In PDS it is a statement that takes a drive.
+    0x017F: _op(0x017F, "CHDRIVE", (), 1, "CHDRIVE", "stmt"),
+}
+
+
 #: Opcodes whose ``str`` payload is a procedure signature.
 SIGNATURE_OPS = frozenset({0x0044, 0x0058, 0x0076})
 

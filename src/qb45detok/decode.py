@@ -14,7 +14,10 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
 
 from . import tokens
-from .reader import BinFile, Section
+from .reader import PDS71, BinFile, Section
+
+#: The version byte that says BASIC 7 PDS wrote the file.
+PDS_VERSION = PDS71.version
 
 
 @dataclass
@@ -26,6 +29,7 @@ class Instr:
     operands: List[int] = field(default_factory=list)
     payload: bytes = b""  #: for length-prefixed opcodes
     op: Optional[tokens.Op] = None
+    param_len: int = 6  #: bytes per signature parameter; PDS writes 8
 
     @property
     def known(self) -> bool:
@@ -72,7 +76,7 @@ class Instr:
         """The procedure signature carried by DECLARE, SUB and FUNCTION."""
         if self.code not in tokens.SIGNATURE_OPS:
             return None
-        return parse_signature(self.payload)
+        return parse_signature(self.payload, self.param_len)
 
     def __str__(self) -> str:
         parts = [self.mnemonic]
@@ -160,7 +164,13 @@ def _alias(payload: bytes, kind: int, off: int) -> str:
     return payload[off : off + n].decode("latin-1")
 
 
-def parse_signature(payload: bytes) -> Optional[Signature]:
+#: Bytes per parameter entry. PDS writes two more than 4.5 does, and what
+#: they hold is not known; they are zero in every PDS file seen.
+PARAM_LEN = 6
+PDS_PARAM_LEN = 8
+
+
+def parse_signature(payload: bytes, param_len: int = PARAM_LEN) -> Optional[Signature]:
     """Unpack ``[ref][0x0100][count]`` then ``[ref][0x0200][type]`` per parameter."""
     if len(payload) < 6:
         return None
@@ -171,14 +181,15 @@ def parse_signature(payload: bytes) -> Optional[Signature]:
         # different from an empty one written as "()".
         return Signature(ref=word(0), params=[], kind=word(2), listed=False,
                          alias=_alias(payload, word(2), 6))
-    if len(payload) < 6 + 6 * count:
+    if len(payload) < 6 + param_len * count:
         return None
     params = [
-        Param(ref=word(6 + 6 * i), mode=word(8 + 6 * i), type_code=word(10 + 6 * i))
+        Param(ref=word(6 + param_len * i), mode=word(8 + param_len * i),
+              type_code=word(10 + param_len * i))
         for i in range(count)
     ]
     return Signature(ref=word(0), params=params, kind=word(2), listed=True,
-                     alias=_alias(payload, word(2), 6 + 6 * count))
+                     alias=_alias(payload, word(2), 6 + param_len * count))
 
 
 @dataclass
@@ -290,7 +301,14 @@ def decode_section(bf: BinFile, section: Section) -> DecodedSection:
             if code == tokens.END_OF_SECTION[0] and i + 1 < n and w[i + 1] == tokens.END_OF_SECTION[1]:
                 break
             op = tokens.lookup(code)
-            instr = Instr(offset=i * 2, code=code, op=op)
+            if bf.layout.version == PDS_VERSION:
+                # PDS prints things 4.5 keeps a slot for and will not render,
+                # so its own table wins where the two disagree.
+                op = tokens.PDS_OPS.get(code, op)
+            instr = Instr(offset=i * 2, code=code, op=op,
+                          param_len=(PDS_PARAM_LEN
+                                     if bf.layout.version == PDS_VERSION
+                                     else PARAM_LEN))
             i += 1
             for kind in op.operands if op else ():
                 if kind in ("u32", "f32", "f64"):

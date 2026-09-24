@@ -62,6 +62,7 @@ Then put the two in `corpus/bin/NAME.BAS` and `corpus/txt/NAME.BAS`.
 | `E12.BAS` | nested `TYPE`s, `LSET` between records, string `CONST`, `OPEN` with no `FOR` clause |
 | `E13.BAS` | `DIM SHARED`, `STATIC` and `SHARED` inside a `SUB`, `ERASE`, `TAB`/`SPC` written to a file |
 | `INCL.BAS` + `INCL.BI` | `$INCLUDE`, with labelled and numbered lines in the included file |
+| `PDSKEY.BAS` | the keywords BASIC 7 PDS adds; save it through QBX, not QB 4.5 |
 
 The corpus also holds five batches of the programming examples printed in the
 QuickBASIC 4.5 reference, pulled out of `QB45ADVR.HLP` with `qb45detok
