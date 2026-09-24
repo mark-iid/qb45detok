@@ -78,6 +78,7 @@ class OutSection:
     return_type: int = 0             #: a FUNCTION's return type, else 0
     trailer_kind: Optional[int] = None
     head: Sequence[int] = (0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF)
+    included_count: int = 0          #: lines that came from an $INCLUDE file
     unknown_c: int = 0
 
     @property
@@ -95,8 +96,8 @@ class OutSection:
         kind = KIND_MODULE if self.is_module else KIND_PROC
         if self.trailer_kind is not None:
             kind = self.trailer_kind
-        return out + struct.pack("<HHHHIHH", *self.head, self.line_count,
-                                 self.unknown_c, kind)
+        return out + struct.pack("<HHHHHHHH", *self.head, self.line_count,
+                                 self.included_count, self.unknown_c, kind)
 
 
 class ImageWriter:

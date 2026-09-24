@@ -191,6 +191,8 @@ class Line:
     label_ref: Optional[int] = None  #: name-table ref of this line's label
     label_offset: Optional[int] = None
     wide_indent: Optional[int] = None  #: indentation too large for the header
+    included: bool = False  #: the line came from an ``$INCLUDE`` file
+    include_ref: Optional[int] = None  #: which file, on an unlabelled line
 
     @property
     def indent(self) -> int:
@@ -243,21 +245,44 @@ def decode_section(bf: BinFile, section: Section) -> DecodedSection:
             break
         line = Line(header=w[i], offset=i * 2)
         i += 1
-        # A line can carry both, and the label pair comes first.
-        if line.header & tokens.LINE_HAS_LABEL:
-            if i + 1 >= n:
+        words = tokens.INCLUDED_HEADERS.get(line.header)
+        if words is not None:
+            # A line pulled in by $INCLUDE. The two labelled forms carry the
+            # same label pair the ordinary ones do; the two plain forms carry
+            # a single word naming the file instead.
+            if i + words > n:
                 out.truncated = True
                 out.lines.append(line)
                 break
-            line.label_offset, line.label_ref = w[i], w[i + 1]
-            i += 2
-        if line.header & tokens.LINE_HAS_INDENT:
-            if i >= n:
-                out.truncated = True
-                out.lines.append(line)
-                break
-            line.wide_indent = w[i]
-            i += 1
+            line.included = True
+            if line.header in (0x0034, 0x0035):
+                line.label_offset, line.label_ref = w[i], w[i + 1]
+                i += 2
+                if line.header == 0x0035:
+                    line.wide_indent = w[i]
+                    i += 1
+            else:
+                line.include_ref = w[i]
+                i += 1
+                if line.header == 0x0003:
+                    line.wide_indent = w[i]
+                    i += 1
+        else:
+            # A line can carry both, and the label pair comes first.
+            if line.header & tokens.LINE_HAS_LABEL:
+                if i + 1 >= n:
+                    out.truncated = True
+                    out.lines.append(line)
+                    break
+                line.label_offset, line.label_ref = w[i], w[i + 1]
+                i += 2
+            if line.header & tokens.LINE_HAS_INDENT:
+                if i >= n:
+                    out.truncated = True
+                    out.lines.append(line)
+                    break
+                line.wide_indent = w[i]
+                i += 1
         while i < n:
             code = w[i]
             if tokens.is_line_header(code):
@@ -297,6 +322,19 @@ def decode_section(bf: BinFile, section: Section) -> DecodedSection:
         if out.truncated:
             break
 
+    # A labelled included line is introduced by an empty `0002` header. It
+    # belongs to the line the label is on rather than being one of its own,
+    # so it is folded away here and the section's line count then matches
+    # what the trailer records.
+    kept: List[Line] = []
+    for j, line in enumerate(out.lines):
+        following = out.lines[j + 1] if j + 1 < len(out.lines) else None
+        if (line.included and not line.instrs and line.label_ref is None
+                and following is not None
+                and following.header in (0x0034, 0x0035)):
+            continue
+        kept.append(line)
+    out.lines = kept
     return out
 
 

@@ -19,8 +19,8 @@ pytestmark = requires_corpus
 
 #: Sections whose line count matches the trailer. Every section does; this is
 #: here so a regression shows up as a failure rather than a silent slip.
-SECTIONS_IN_SYNC = 253
-TOTAL_SECTIONS = 253
+SECTIONS_IN_SYNC = 254
+TOTAL_SECTIONS = 254
 
 
 @pytest.fixture(scope="module", params=NAMES)

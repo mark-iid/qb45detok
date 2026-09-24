@@ -38,7 +38,8 @@ def rebuild(bf: BinFile) -> bytes:
             proc_kind=s.proc_kind if s.proc_kind is not None else 1,
             return_type=s.return_type if s.return_type is not None else 0,
             trailer_kind=s.trailer.kind,
-            head=s.trailer.head, unknown_c=s.trailer.unknown_c))
+            head=s.trailer.head, unknown_c=s.trailer.unknown_c,
+            included_count=s.trailer.included_count))
     return w.build()
 
 

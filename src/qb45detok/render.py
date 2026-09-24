@@ -396,6 +396,11 @@ class Renderer:
             elif mn == "REM_META":
                 # A comment written with the REM keyword rather than "'".
                 emit("REM" + (ins.text or ""))
+            elif mn == "META_INCLUDE":
+                # The path is the payload, and it already carries the closing
+                # quote that the metacommand is written with.
+                if parts:
+                    parts[-1] += "$INCLUDE: '" + (ins.text or "")
             elif mn in ("META_DYNAMIC", "META_STATIC"):
                 # Supplies the metacommand text for the comment before it.
                 # "' $DYNAMIC" keeps the space the comment stored, which the
@@ -1191,6 +1196,8 @@ class Renderer:
             if (not ds.section.is_module and lines and lines[0].instrs
                     and lines[0].instrs[0].mnemonic == "DEFTYPE"):
                 lines = lines[1:]
-            return [self.safe_line(line) for line in lines]
+            # QB does not write included lines out as text. They are in the
+            # file so that a compile does not have to read the .BI again.
+            return [self.safe_line(line) for line in lines if not line.included]
         finally:
             self.section_kind = None

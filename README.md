@@ -34,7 +34,7 @@ head -c 1 OLDPROG.BAS | od -An -tx1
 | `f9`, `f1`, `f3` | older Microsoft BASIC | [decode_ms_basic.py] |
 | printable text | already ASCII | nothing to do |
 
-Only the `fc` row is something I've verified myself, across fifty-seven files.
+Only the `fc` row is something I've verified myself, across fifty-eight files.
 The rest is from those projects' own documentation, and is here so you don't
 waste time on the wrong tool, as I did.
 
@@ -184,13 +184,13 @@ qb45detok stats PROGRAM.BAS        # how much of the token stream is identified
 
 ## How well it works
 
-Across the fifty-seven programs I've tested it on (my own code, a QuickBASIC
+Across the fifty-eight programs I've tested it on (my own code, a QuickBASIC
 sample, and small programs written to exercise one feature each) every one comes
 back byte for byte identical to what QuickBASIC itself writes with Save As Text.
 The largest is 2,386 lines.
 
-Every opcode in those programs is identified, and all 253 code sections decode
-to exactly the line count the file records for them. The writer rebuilds all 57
+Every opcode in those programs is identified, and all 254 code sections decode
+to exactly the line count the file records for them. The writer rebuilds all 58
 files byte for byte from their own decoded structure.
 
 I also checked the opcode table against the 224 keywords in the QuickBASIC 4.5
@@ -207,14 +207,15 @@ to look. Nothing is guessed at quietly.
 
 - A statement I haven't run through it would show up as a marked line rather
   than as silently wrong output.
-- Eleven of the 256 statement opcodes are unassigned, and none of them is a
-  missing statement. Nine are line-header values, which can't be statements at
-  all, and two more behave the same way, sending QB into a loop when it is
-  handed one. The single unassigned function code is an unused slot in the
-  type-conversion family rather than a missing name.
-- Three opcodes belong to `$INCLUDE`, which nothing in my corpus uses. They're
-  placed from the other two projects' tables rather than from a run here, so
-  `tokens.py` doesn't carry them yet.
+- Every statement opcode is accounted for. Thirteen of the 256 values are
+  line headers or other structure rather than statements, and the single
+  unassigned function code is an unused slot in the type-conversion family
+  rather than a missing name.
+- `$INCLUDE` reads but doesn't write. QuickBASIC stores every line of the
+  included file in the binary and leaves them out when it saves as text, and
+  `detok` does the same. The tokenizer has no idea, so a `REM $INCLUDE:` line
+  goes back out as an ordinary comment: the text survives the round trip and
+  the bytes don't.
 - A handful of statement forms are stored identically and can't be told apart.
   `LOCK #1, TO 32` and `LOCK #1, 1 TO 32` produce the same tokens, so the first
   comes back as the second.

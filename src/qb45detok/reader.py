@@ -116,11 +116,16 @@ class Trailer:
     unidentified word, and a kind word. The leading words are often all 0xff,
     which is why they once looked like a fixed signature; TORUS shows they are
     not, so sections are found by chaining declared lengths instead.
+
+    The line count is two words rather than one u32. The first is every source
+    line in the section and the second is how many of them came from an
+    ``$INCLUDE`` file, which is zero unless the program uses one.
     """
 
     offset: int
     head: Tuple[int, int, int, int]  #: four u16s, purpose unknown
-    line_count: int  #: u32, source lines in the section (SUB..END SUB inclusive)
+    line_count: int  #: u16, source lines in the section (SUB..END SUB inclusive)
+    included_count: int  #: u16, how many of them came from an include
     unknown_c: int  #: u16
     kind: int  #: u16, 0x0102 for the module text, 0x0c02 for a procedure
 
@@ -286,7 +291,8 @@ class BinFile:
         return Trailer(
             offset=off,
             head=(_u16(d, off), _u16(d, off + 2), _u16(d, off + 4), _u16(d, off + 6)),
-            line_count=_u32(d, off + 8),
+            line_count=_u16(d, off + 8),
+            included_count=_u16(d, off + 10),
             unknown_c=_u16(d, off + 12),
             kind=_u16(d, off + 14),
         )

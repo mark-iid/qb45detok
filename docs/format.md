@@ -40,7 +40,7 @@ every reference in every corpus file resolves to an entry boundary.
     fc 00 01 00 0c 00 81 01 82 01 06 00 01 02 03 04 05 08  ..  ..  ff ff 24 00
      0                                                     12  13
 
-Bytes `0x00`-`0x11` are byte-identical in all 57 files. `0xfc` at offset 0 is
+Bytes `0x00`-`0x11` are byte-identical in all 58 files. `0xfc` at offset 0 is
 the format magic.
 
 - `0x12`: `0x10` everywhere except `PROJECT2.BAS`, which has `0x11`. Unknown.
@@ -61,7 +61,7 @@ the format magic.
 
 41 `u16` hash buckets at `0x1c`, each holding the reference of the first name
 entry in its chain, or 0 for an empty bucket. Verified: following every
-bucket chain reaches every name-table entry exactly once, in all 57 files.
+bucket chain reaches every name-table entry exactly once, in all 58 files.
 Only buckets 0 to 39 are ever used; slot 40 is empty in every file.
 
 The two kinds of name are hashed into separate halves of the table. Numeric
@@ -89,7 +89,7 @@ other 40 buckets empty, loads and re-saves with the source text unchanged.
 
 - `0x6e`: reference one past the last name entry, i.e. the end of the name
   table. Verified: walking entries from `0x72` lands exactly here.
-- `0x70`: `0x0052` in all 57 files, which is the reference of `0x6e` itself.
+- `0x70`: `0x0052` in all 58 files, which is the reference of `0x6e` itself.
   Probably a fixed "end of buckets" marker.
 
 ## Name table (from `0x72`)
@@ -125,7 +125,7 @@ can produce a 6,855-byte file.
 ## Code sections
 
 The module-level text comes first, at `code_ref + 0x1c`, and is preceded by a
-`u16` byte length. Verified: that length is exact in all 57 files.
+`u16` byte length. Verified: that length is exact in all 58 files.
 
 Every section is followed by a 16-byte trailer:
 
@@ -174,14 +174,14 @@ known. It doesn't track whether the procedure takes parameters, whether it
 is a `FUNCTION` rather than a `SUB`, or whether its header carries `0017`.
 
 Verified: these names match the `SUB`/`FUNCTION` names in the text exactly,
-for all 57 files, and the sections tile the file from the code reference to
+for all 58 files, and the sections tile the file from the code reference to
 EOF with no gaps.
 
 ## Procedure sections in detail
 
 A procedure section starts at the run of comment lines immediately above its
 `SUB`/`FUNCTION` in the source, not at the keyword. Verified: with that
-rule, `line_count` matches the text for every procedure in all 57 files,
+rule, `line_count` matches the text for every procedure in all 58 files,
 including `PROJECT2`'s `MarkTest` and `BondCalc`, which look four lines short
 otherwise.
 
@@ -457,8 +457,8 @@ sections decoding to exactly the line count their trailer records and decoded
 indentation matching QB's text output on every procedure line that can be
 checked. `qb45detok stats FILE` reports this per file.
 
-Rendering those tokens back to source reproduces all 57 corpus files byte for
-byte, the largest of them 2,386 lines, and all 12,708 lines overall.
+Rendering those tokens back to source reproduces all 58 corpus files byte for
+byte, the largest of them 2,386 lines, and all 12,715 lines overall.
 
 Cross-checked against the 224 keywords in the QB 4.5 help index, every
 documented statement and function is either an identified opcode or handled by
@@ -591,58 +591,55 @@ which is what made the placement safe to leave alone.
 What follows is everything still open, and for the opcodes it says what kind
 of thing each one is even where the name isn't known.
 
-**Opcodes.** The statement range is 245 of 256 assigned, the function range
-127 of 128. What is left divides into three groups.
+**Opcodes.** Every statement opcode is now accounted for, and the function
+range is 127 of 128. What is left isn't a statement at all.
 
-- Nine values below `000a` are structural rather than statements. `0000`,
-  `0001`, `0004` and `0005` are line headers the decoder has to read as such,
-  `0002` and `0003` are the two that mark an included line, and handing QB any
-  of them as a statement sends it into a loop, writing lines until it's
-  stopped. The rest of that range is almost certainly the same.
-- `0013` and `0014` behave exactly like `0002`, so they aren't statements
-  either.
-- `0034`, `0035` and `0099` belong to `$INCLUDE`, which nothing in the corpus
-  uses. See below.
+- Thirteen values are line headers or other structure. `0000`, `0001`, `0004`
+  and `0005` head an ordinary line, `0002`, `0003`, `0034` and `0035` head one
+  that came from an `$INCLUDE` file (see below), and `0006` to `0009`, `0013`
+  and `0014` behave the same way: handed to QB as a statement, each sends it
+  into a loop writing lines until it is stopped.
 
-### The `$INCLUDE` family
+### `$INCLUDE`
 
-Three opcodes sat on the unknown list for the same reason: no program in the
-corpus uses `$INCLUDE`, so none of them ever appears, and handing a bare one
-to QuickBASIC or to PDS produced a bare colon or a refusal. Two other readings
-of this format place them, and together they make one coherent group.
+Five values belong to `$INCLUDE`, and nothing in the original corpus used one,
+so all five sat unidentified for a long time. `samples/INCL.BAS` and its
+`INCL.BI` were written to produce them and saved through QuickBASIC 4.5; what
+follows is from that file. Verified.
 
-| Opcode | What it is |
-|---|---|
-| `0002`, `0003` | line headers for a line that came from an included file |
-| `0034`, `0035` | the same, for an included line that carries a label |
-| `0099` | the `$INCLUDE` metacommand itself |
+| Value | What it is | Words after it |
+|---|---|---|
+| `0099` | the `$INCLUDE` metacommand | a counted string, the path |
+| `0002` | line header, included line | 1, naming the file |
+| `0003` | the same, with the indent escape | 2 |
+| `0034` | line header, included line with a label | 2, the label pair |
+| `0035` | the same, with the indent escape | 3 |
 
-`0099` takes a length-prefixed path and is written `$INCLUDE: 'NAME.BI`, the
-same payload shape as the comment opcode `0097` without its column word. That
-is from `Qb45Format.ts` in [jeredw/qbc]. `0034` and `0035` pair with the
-labelled line headers `0004` and `0005`, carrying the same fields at the same
-offsets and the same lengths; `QB45BIN`'s rule table shows the pairing and
-`Qb45Format.ts` decodes each pair with shared code, commenting that the higher
-two are "used in $INCLUDEd lines".
+`0099` sits on the line with the `REM` or `'` that introduces it, after the
+comment opcode, the way `$DYNAMIC` and `$STATIC` do. Its payload is raw text
+with no leading word, and it holds the closing quote but not the opening one:
+`REM $INCLUDE: 'INCL.BI'` stores `INCL.BI'`. It sits immediately below `009a`,
+the `BEEP` that opens the alphabetical run through to `WRITE`, which is where
+something that isn't a keyword belongs and nowhere a keyword could go.
 
-```
-0x004  4,".{#newline}{#thaddr:0}{#label:2}"
-0x034  4,"newline::={#thaddr:0}{#label:2} "
-0x005  6,".{#newline}{#thaddr:0}{#label:2} {#indent:4}"
-0x035  6,"newline::={#thaddr:0}{#label:2} {#indent:4}"
-```
+**The included lines are in the file.** QuickBASIC expands the include when it
+saves, and stores every line of the `.BI` in the module section with one of the
+four headers above, so a compile doesn't have to read the file again. It does
+not write those lines out as text: saving the same program as text gives back
+only the lines of the `.BAS`. A detokenizer has to do the same, which is why
+`render.py` drops them.
 
-Two things corroborate it here. `0099` sits immediately below `009a`, the
-`BEEP` that opens the alphabetical run through to `WRITE`, which is where
-something that isn't a keyword belongs and nowhere a keyword could go. And it
-explains the refusals: `0099` wants a string payload, and it was offered a
-bare opcode and then stack operands, neither of which it can read.
+`0034` and `0035` carry the same label pair as `0004` and `0005`, with the
+indent word on the longer form holding the gap between the label and the
+statement, exactly as it does on an ordinary line. One wrinkle: a labelled
+included line is introduced by an *empty* `0002` header, which belongs to that
+line rather than being a line of its own. Fold it away and the section's line
+count matches its trailer again.
 
-Not confirmed by experiment here. The check is a five-minute one for anyone
-with a DOS setup: save a program with an `$INCLUDE` in QuickBASIC 4.5, and a
-labelled line in the included file, then look for `0099` and `0034`. Until
-that is done this is two other projects' reading rather than a result, and
-`tokens.py` doesn't carry these three.
+Two other projects read these before this did, and both were right: `QB45BIN`
+pairs `0034` and `0035` with the labelled line headers in its rule table, and
+`Qb45Format.ts` in [jeredw/qbc] decodes `0099` as the metacommand and notes
+that the other two are "used in $INCLUDEd lines".
 
 [jeredw/qbc]: https://github.com/jeredw/qbc
 
@@ -665,7 +662,7 @@ would surround it. All three stay silent here, because reproducing what
 QuickBASIC 4.5 writes is the contract.
 
 Neither the opcodes still unidentified nor these three appear anywhere in the
-corpus: 57 files and 12,708 lines, including programs written by other people.
+corpus: 58 files and 12,715 lines, including programs written by other people.
 No real program reaches them, so source alone was never going to close them.
 
 **Fields.**
@@ -712,8 +709,8 @@ QB writes the identifier as `decimal`. There's only one entry, confirmed by
 walking the chains and by walking the table linearly and getting the same 237
 either way, so this isn't two entries with different spellings.
 
-It has never been seen in a real program. All 57 corpus files round-trip byte
-for byte, including 12,708 lines of code written by other people, so whatever
+It has never been seen in a real program. All 58 corpus files round-trip byte
+for byte, including 12,715 lines of code written by other people, so whatever
 causes it needs the kind of collision that only arises from stitching
 unrelated programs together.
 
@@ -730,7 +727,7 @@ could not:
 
 - **A writer, and then a tokenizer.** Writing the format checks more than
   reading it does, since it has to reproduce every field rather than skip what
-  it doesn't understand. Rebuilding all 57 corpus files byte for byte
+  it doesn't understand. Rebuilding all 58 corpus files byte for byte
   exposed three fields the reader had glossed over: the procedure preamble
   records `SUB` or `FUNCTION` and the return type, the trailer kind isn't
   always `0c02`, and there's a fixed 259-byte gap between the name table and
@@ -761,10 +758,9 @@ What would help now, in order:
   checked.
 - **PDS-written files.** PDS reads 4.5 files correctly, but what it writes
   hasn't been looked at.
-- **Confirming the `$INCLUDE` family.** `0002`, `0003`, `0034`, `0035` and
-  `0099` are placed above on other projects' evidence and not on any run here,
-  and no statement opcode is unaccounted for once they are. One saved program
-  settles it.
+- **Tokenizing `$INCLUDE`.** The reader handles it. The writer does not: a
+  `REM $INCLUDE:` line goes back out as an ordinary comment, so the text
+  round-trips but the bytes don't.
 - **The last four example batches.** Five of the nine round-trip exactly and
   are in the corpus. The other four differ on twenty lines: two are the `LOCK`
   ambiguity described above, some are a name recorded in one letter case and

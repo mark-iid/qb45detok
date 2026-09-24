@@ -72,8 +72,9 @@ REM = 0x0097
 
 #: Opcodes whose ``str`` payload is source text with no leading word.
 #: ``REM`` written as the keyword carries its text with no leading
-#: column word, unlike the apostrophe form.
-RAW_TEXT_OPS = frozenset({0x00E3})
+#: column word, unlike the apostrophe form, and so does the path on
+#: ``$INCLUDE``.
+RAW_TEXT_OPS = frozenset({0x00E3, 0x0099})
 
 #: Opcodes whose ``str`` payload is a procedure signature.
 SIGNATURE_OPS = frozenset({0x0044, 0x0058, 0x0076})
@@ -104,11 +105,26 @@ def escaped_indent(word: int) -> int:
 #: Set in a line header when a label follows: two more words, an offset and
 #: the label's name-table reference.
 LINE_HAS_LABEL = 0x0004
+
+#: A line that came from an ``$INCLUDE`` file is headed by one of its own
+#: values rather than by the flags above. ``0002`` and ``0003`` are the plain
+#: and escaped-indent forms and carry one extra word naming the file; ``0034``
+#: and ``0035`` are the labelled forms, and carry the same label pair as
+#: ``0004`` and ``0005`` do.
+INCLUDED_HEADERS = {0x0002: 1, 0x0003: 2, 0x0034: 2, 0x0035: 3}
+
 _HEADER_FLAGS = LINE_HAS_INDENT | LINE_HAS_LABEL
 
 
 def is_line_header(word: int) -> bool:
+    if word in INCLUDED_HEADERS:
+        return True
     return word & LINE_HEADER_MASK & ~_HEADER_FLAGS == 0
+
+
+def included_header(word: int) -> bool:
+    """Whether a header marks a line that came from an included file."""
+    return word in INCLUDED_HEADERS
 
 
 def indent_of(word: int) -> int:
@@ -202,6 +218,7 @@ _OPS = [
     _op(0x0029, "KEY_EVENT", (), 1, "KEY", "stmt"),
     _op(0x002B, "EVENT_ON", (), 0, "ON", "stmt"),
     _op(0x0023, "CONST", (), None, "CONST", "stmt"),
+    _op(0x0099, "META_INCLUDE", ("str",), 0, None, "stmt"),
     _op(0x0032, "TIMER_EVENT", (), 0, "TIMER", "stmt"),
     _op(0x0033, "TIMER_SELECT", (), 1, "TIMER", "stmt"),
     _op(0x003A, "CASE_ELSE", (), 0, "CASE ELSE", "stmt"),

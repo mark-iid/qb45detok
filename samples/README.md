@@ -84,15 +84,13 @@ version, and `RESERVED.BAS` is the same case reached deliberately.
 `TRAIL1`/`TRAIL2` and `EDIT1` are experiments rather than coverage. See the
 "Known unknowns" section of `docs/format.md` for what they answered.
 
-`INCL` is the same kind of thing and hasn't been run yet. Nothing in the corpus
-uses `$INCLUDE`, so five opcodes are placed in `docs/format.md` from two other
-projects' tables rather than from anything here: `0099` for the metacommand,
-`0002` and `0003` for a line that came from an included file, and `0034` and
-`0035` for an included line carrying a label. `INCL.BI` has to sit next to
-`INCL.BAS` in the same directory when QB loads it, or the include won't
-resolve. Save it both ways as above, then look for those five words. Running
-the program with F5 first is worth trying as a second case, since QB may only
-process the include when it compiles.
+`INCL` was the same kind of thing and has now been run. It settled five values
+that nothing else in the corpus reaches: `0099` for the metacommand, `0002` and
+`0003` for a line that came from an included file, and `0034` and `0035` for an
+included line carrying a label. It also showed that QuickBASIC stores the whole
+of the `.BI` in the binary and leaves it out when it saves as text. `INCL.BI`
+has to sit next to `INCL.BAS` in the same directory when QB loads it, or the
+include won't resolve.
 
 All of these have been through QB and are in the corpus. None is expected to
 run usefully, and `SYSTEM.BAS` ends by raising an error on purpose. They only
