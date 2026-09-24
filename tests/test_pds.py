@@ -102,3 +102,17 @@ def test_pds_moves_the_type_high_bytes_too():
     assert tokens.PDS_TYPE_BY_HIGH_BYTE[24] == "$"
     assert tokens.lookup(0x180E) is None
     assert tokens.lookup(0x180E, tokens.PDS_TYPE_BY_HIGH_BYTE).mnemonic == "ARRAY$"
+
+
+def test_savepoint_and_getindex_are_functions():
+    """Both were refused as statements; the help file said why."""
+    assert tokens.PDS_OPS[0x018A].mnemonic == "SAVEPOINT"
+    assert tokens.PDS_OPS[0x018A].arity == 0
+    assert tokens.PDS_OPS[0x0188].mnemonic == "GETINDEX$"
+    assert tokens.PDS_OPS[0x0188].arity == 1
+
+
+def test_rollback_has_three_forms():
+    assert tokens.PDS_OPS[0x019C].text == "ROLLBACK"
+    assert tokens.PDS_OPS[0x019D].arity == 1        # ROLLBACK <savepoint>
+    assert tokens.PDS_OPS[0x019E].text == "ROLLBACK ALL"

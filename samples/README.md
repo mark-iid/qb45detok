@@ -63,6 +63,11 @@ Then put the two in `corpus/bin/NAME.BAS` and `corpus/txt/NAME.BAS`.
 | `E13.BAS` | `DIM SHARED`, `STATIC` and `SHARED` inside a `SUB`, `ERASE`, `TAB`/`SPC` written to a file |
 | `INCL.BAS` + `INCL.BI` | `$INCLUDE`, with labelled and numbered lines in the included file |
 | `PDSKEY.BAS` | the keywords BASIC 7 PDS adds; save it through QBX, not QB 4.5 |
+| `PDSISAM.BAS` | the PDS ISAM statements, written out plainly |
+| `PDSISM2.BAS` | the same, one per pair of lines with a `PRINT 1` between each |
+| `PDSISM3.BAS` | `SAVEPOINT`, `GETINDEX$` and the two other `ROLLBACK` forms |
+| `PDSFMT.BAS` | the PDS functions, separated the same way |
+| `PDSLIB.BAS` | the financial, date and `FORMAT` families, which are library routines |
 
 The corpus also holds five batches of the programming examples printed in the
 QuickBASIC 4.5 reference, pulled out of `QB45ADVR.HLP` with `qb45detok
@@ -84,6 +89,13 @@ version, and `RESERVED.BAS` is the same case reached deliberately.
 
 `TRAIL1`/`TRAIL2` and `EDIT1` are experiments rather than coverage. See the
 "Known unknowns" section of `docs/format.md` for what they answered.
+
+The `PDS*` samples go through `QBX.EXE`, not `QB.EXE`, and the first entry in
+its Save As Format control is the binary one. `PDSISM2` and `PDSISM3` show the
+trick that made the PDS opcodes readable: put each statement between two lines
+of a known shape, because an opcode whose operand count you do not yet know
+will otherwise swallow whatever follows it and every reading after that is
+wrong.
 
 `INCL` was the same kind of thing and has now been run. It settled five values
 that nothing else in the corpus reaches: `0099` for the metacommand, `0002` and

@@ -643,7 +643,9 @@ still have its extent measured.
 | `0184` | `DIR$` | |
 | `0186` | `BOF` | |
 | `0187` | `CVC` | |
+| `0188` | `GETINDEX$` | |
 | `0189` | `MKC$` | |
+| `018a` | `SAVEPOINT` | |
 | `018b` | `SSEG` | |
 | `018c` | `SSEGADD` | |
 | `1508` | `CCUR` | |
@@ -659,6 +661,8 @@ still have its extent measured.
 | `019a` | `OPEN ... FOR ISAM` | 2, the second naming the record type |
 | `019b` | `RETRIEVE` | |
 | `019c` | `ROLLBACK` | |
+| `019d` | `ROLLBACK <savepoint>` | |
+| `019e` | `ROLLBACK ALL` | |
 | `019f` | `SEEKEQ`/`SEEKGE`/`SEEKGT` | 2, the first the comparison |
 | `01a1` | `SETINDEX` | |
 | `01a6` | `UPDATE` | |
@@ -686,9 +690,18 @@ as ordinary calls, which is the same evidence either way:
 - the far-string helpers `STRINGADDRESS`, `STRINGLENGTH`, `STRINGASSIGN` and
   `STRINGRELEASE`
 
-`SAVEPOINT` and `GETINDEX$` are the two this has not settled. QBX refused both
-as written in `samples/PDSISAM.BAS` and kept them as text, so the syntax there
-is wrong rather than the keywords being absent.
+`SAVEPOINT` and `GETINDEX$` took a second attempt. QBX refused both as written
+in `samples/PDSISAM.BAS` and kept them as text, because both are functions
+rather than statements: `SAVEPOINT` returns the integer that names the
+savepoint it just took, and `GETINDEX$` wants a plain file number with no `#`.
+`BAS7QCK.HLP` says so, and `qb45detok hlp-show` reads it. That topic also named
+a `ROLLBACK ALL` this had not tried, and a `ROLLBACK <savepoint>`; each has an
+opcode of its own.
+
+Twelve values in the `0181` block are still unaccounted for: `0182`, `0183`,
+`0185`, `018d`, `0195`, `0196`, `0199`, `01a0`, `01a2` to `01a5`. No keyword in the PDS
+help index is left over to put in them, so either they are forms of the
+statements already there or the index does not list them.
 
 ## Known unknowns
 

@@ -194,14 +194,14 @@ Four differences, all of them small, and `docs/format.md` has the detail:
 - two more bytes per parameter in a procedure signature
 - a block of opcodes of its own for the keywords PDS adds
 
-Twenty-four of them are named, read off programs written to produce them: the
+Twenty-eight of them are named, read off programs written to produce them: the
 ISAM statements, the currency conversions, `CURDIR$`, `DIR$`, `BOF`, `SSEG`,
 `SSEGADD`, and `CHDRIVE`, which 4.5 keeps a slot for and will not print. The
 help index lists about seventy names PDS has and 4.5 does not, but most of them
 turn out to be routines in its libraries rather than words in the language: the
 financial family, the date and time family, the whole of `FORMAT`, and the
-far-string helpers all tokenize as ordinary calls. `SAVEPOINT` and `GETINDEX$`
-are the two still open.
+far-string helpers all tokenize as ordinary calls. No keyword in the index is
+now unaccounted for.
 
 ## Reading old data files
 
