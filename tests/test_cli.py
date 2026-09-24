@@ -63,3 +63,9 @@ def test_tok_makes_a_file_detok_reads_back(tmp_path, capsys):
     assert binary.read_bytes()[0] == 0xFC
     assert main(["detok", str(binary)]) == 0
     assert capsys.readouterr().out == 'PRINT "hi"\nEND\n\n'
+
+
+def test_lint_exits_non_zero_when_there_is_something_to_fix(capsys):
+    assert main(["lint", str(CORPUS_BIN / "COVER2.BAS")]) == 1
+    out = capsys.readouterr().out
+    assert "CALL ABSOLUTE" in out and "CALLS" in out

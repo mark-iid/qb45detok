@@ -127,6 +127,46 @@ the hash QB uses for names is still unknown, so the writer puts everything in
 one chain. That is what those four files test, and QB rebuilds its own lookup
 on load rather than trusting the one it was given.
 
+## Porting to QB64
+
+QB64 Phoenix Edition aims at QuickBASIC 4.5 compatibility and gets most of the
+way there, but about two dozen keywords are missing. The awkward part is what
+its own documentation says about them: "older code that uses these keywords
+won't generate errors, as these are ignored by the compiler." The program
+builds, runs, and quietly does something else.
+
+```
+qb45detok lint OLDPROG.BAS
+```
+
+```
+QB64 ignores these. The program will build and run, and do something else.
+
+  <module>:9               CALLS
+                           CALLS Ext(3)
+                           -> call the procedure directly; QB64 passes by reference already
+
+These have to be rewritten before it will build.
+
+  <module>:10              CALL ABSOLUTE
+                           CALL ABSOLUTE(0)
+                           -> machine code in a DATA statement will not run; rewrite the routine in BASIC
+```
+
+It takes either format, and exits non-zero when it finds something. The rules
+come from the list QB64 ships in `internal/help/`, not from my recollection of
+what it supports.
+
+The check is made against the tokens rather than the text, which is why it
+lives here. QuickBASIC recorded what it understood each line to mean, so a
+variable called `fre`, the word `TRON` inside a string and a comment mentioning
+`IOCTL` are all invisible to it. It also separates cases the text can't:
+reading `DATE$` is supported and assigning to it is not, and QB stores those as
+two different opcodes. `CALL ABSOLUTE` and `CALL INTERRUPT` are caught by the
+name they call, since they're routines in `QB.QLB` rather than keywords.
+
+Across my corpus, 39 of the 58 programs need no changes at all.
+
 ## Reading old data files
 
 Random access files written by these programs hold numbers in Microsoft Binary
@@ -154,6 +194,7 @@ Python 3.9 or newer. No dependencies.
 qb45detok detok PROGRAM.BAS              # write source to stdout
 qb45detok detok PROGRAM.BAS -o OUT.BAS   # write a CRLF text file
 qb45detok tok PROGRAM.TXT -o OUT.BAS     # and back again
+qb45detok lint PROGRAM.BAS               # what will not port to QB64
 ```
 
 If you have a directory of old files and don't know what's in it, start here:
@@ -254,7 +295,7 @@ pytest
 ```
 
 Without a corpus the format-level tests still run and the rest skip, which is
-what happens in CI: 160 of them run there against 1,450 here, since most of
+what happens in CI: 183 of them run there against 1,533 here, since most of
 the suite is one test per corpus file.
 
 ## License

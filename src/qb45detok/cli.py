@@ -10,6 +10,7 @@ from typing import List, Optional
 from .decode import decode_file, decode_section
 from .render import Renderer
 from .quickhelp import HelpFile, QuickHelpError
+from .lint import check, report
 from .tokenize import tokenize
 from .triage import scan
 from .reader import BinFile, ParseError, REF_BASE, Section
@@ -237,6 +238,20 @@ def cmd_tok(args) -> int:
     return 0
 
 
+def cmd_lint(args) -> int:
+    """Report what in a program will not survive a port to QB64."""
+    path = Path(args.file)
+    data = path.read_bytes()
+    if not data.startswith(b"\xfc"):
+        # An ASCII source is tokenized first, so that the check is made
+        # against what QuickBASIC understood the program to mean.
+        data = tokenize(path.read_text(encoding="latin-1"), path.parent)
+    findings = check(BinFile.parse(data))
+    for line in report(findings):
+        print(line)
+    return 1 if findings else 0
+
+
 def cmd_triage(args) -> int:
     """Say what each file in a pile of old BASIC actually is."""
     findings = scan([Path(p) for p in args.paths], args.pattern)
@@ -300,6 +315,10 @@ def build_parser() -> argparse.ArgumentParser:
     tk.add_argument("file")
     tk.add_argument("-o", "--output", help="write to this file instead of stdout")
     tk.set_defaults(func=cmd_tok)
+
+    li = sub.add_parser("lint", help="what will not port to QB64")
+    li.add_argument("file")
+    li.set_defaults(func=cmd_lint)
 
     tr = sub.add_parser("triage", help="identify a directory of old BASIC files")
     tr.add_argument("paths", nargs="+", help="files or directories to look at")
