@@ -8,9 +8,9 @@ rest is observation that still needs confirming.
 One other description of this format exists in runnable form: `QB45BIN.bas`,
 by qarnos, which QB64 Phoenix Edition ships at
 `internal/support/converter/QB45BIN.bas` and runs when its IDE opens a 4.5
-binary. It is a rule table rather than prose, it reads the format without
+binary. It's a rule table rather than prose, it reads the format without
 writing it, and it was arrived at separately from this. The two agree wherever
-both have an entry, and where it says something this did not work out, the
+both have an entry, and where it says something this didn't work out, the
 text below says so.
 
 ## Overall layout
@@ -24,7 +24,7 @@ text below says so.
 
 ## Symbol references
 
-The single most important fact about the format: identifiers do not appear
+The thing to understand before anything else: identifiers don't appear
 inline in the token stream. Everything refers to the name table by a symbol
 reference, and a reference is a byte offset measured from `0x1c`, the start
 of the hash-bucket array, not from the start of the file.
@@ -48,10 +48,10 @@ the format magic.
   editor rather than what format it was saved in. Every file typed or edited
   in QB and then saved holds `0x51`; every file loaded from ASCII text and
   saved holds `0x10`. Verified by generating a file both ways: both are
-  ordinary tokenized programs and both decode identically, so this byte does
-  not mark a failed conversion, even though it looks like it should.
+  ordinary tokenized programs and both decode identically, so this byte
+  doesn't mark a failed conversion, even though it looks like it should.
 - `0x14`-`0x17`: `ff ff 24 00` in every file. Unknown.
-- `0x18`: a `DATA` pointer of some kind. Verified: it is `ffff` in every
+- `0x18`: a `DATA` pointer of some kind. Verified: it's `ffff` in every
   program that has no `DATA` statement and non-`ffff` in exactly the two that
   do. Neither value resolves as a name-table reference, so what it points into
   is still unknown.
@@ -75,15 +75,15 @@ which is exact for all 30 distinct line numbers in the corpus. The high-byte
 fold only shows up above 511, which is why a simpler `(n >> 1) & 7` fits every
 label under that and then fails on 900, 911 and 999.
 
-The hash for names is not known. It is deterministic -- 1,758 distinct names
-across the corpus, none ever in two buckets -- and single letters map `A` to 1
+The hash for names isn't known. It's deterministic (1,758 distinct names
+across the corpus, none ever in two buckets) and single letters map `A` to 1
 through `Z` to 26, which looks like `c & 0x1f`. But a search over the obvious
 rolling-hash families (XOR and add, byte and 5-bit and 7-bit, rotate left and
 right, forward and reversed, with and without a length seed and a final shift)
 found nothing above 85%.
 
-It also does not matter if you are writing a file. QB rebuilds its own lookup
-when it loads a program and does not check what it was given: a corpus file
+It also doesn't matter if you are writing a file. QB rebuilds its own lookup
+when it loads a program and doesn't check what it was given: a corpus file
 rewritten so that all four of its names sit in one chain in bucket 0, with the
 other 40 buckets empty, loads and re-saves with the source text unchanged.
 
@@ -109,17 +109,17 @@ For `flags` `0x00` and `0x40` the payload is the identifier as ASCII.
 | `0x40` | a name used in statement position: a `SUB`, or a `CALL` target |
 | `0x02`, `0x04`, `0x06` | not a name, a 2-byte binary payload, unknown. Only in `DIRMAST`, `DRAWSCR1`, `PROJECT2`, `STARDEF`, the files with line numbers, `TYPE` and `DATA` |
 
-`0x40` marks `SUB`s, not procedures in general. Across the corpus it is set on
+`0x40` marks `SUB`s, not procedures in general. Across the corpus it's set on
 all 383 `SUB` names and on none of the 93 `FUNCTION` names, with no exceptions.
-That is why `DIRMAST` has declared procedures without it: they are functions.
-It is also set on names that have no `DECLARE` at all but are used as a `CALL`
+That's why `DIRMAST` has declared procedures without it: they are functions.
+It's also set on names that have no `DECLARE` at all but are used as a `CALL`
 target, such as `ABSOLUTE`, so the rule is about statement position rather than
 about being declared. Reading it is the cheapest way to tell a `SUB` from a
 `FUNCTION` without decoding a signature.
 
 The table also holds names that appear nowhere in the source. `OBJSCAN` has
 `dir`, `Rotinue`, `Rotine` and `NMALLOC` for a 28-line program. QB evidently
-does not garbage-collect names once entered, which is why a 284-byte program
+doesn't garbage-collect names once entered, which is why a 284-byte program
 can produce a 6,855-byte file.
 
 ## Code sections
@@ -136,9 +136,9 @@ Every section is followed by a 16-byte trailer:
                       (one procedure in the corpus reads 0x0402 instead)
 
 Those first four words are often all `0xff`, which made them look like a
-signature worth scanning for. They are not: in `TORUS` most trailers read
+signature worth scanning for. They aren't: in `TORUS` most trailers read
 `ff ff 04 00 ff ff ff ff`, and scanning finds only one of its seventeen
-sections. Sections are found by chaining declared lengths instead -- every
+sections. Sections are found by chaining declared lengths instead, since every
 section states how long its token stream is, so the walk is stream, trailer,
 next section, to end of file. Verified: this reproduces the previously
 scanned boundaries exactly and finds all of `TORUS`.
@@ -169,8 +169,8 @@ with its own name:
 The preamble's kind byte carries at least one meaning: bit `0x80` marks a
 `STATIC` procedure, which holds for all 196 procedures across the corpus. The
 remaining values are `0x30` and `0x38`, differing by bit `0x08`, and every
-`STATIC` procedure has that bit set as well. What it records on its own is not
-known -- it does not track whether the procedure takes parameters, whether it
+`STATIC` procedure has that bit set as well. What it records on its own isn't
+known. It doesn't track whether the procedure takes parameters, whether it
 is a `FUNCTION` rather than a `SUB`, or whether its header carries `0017`.
 
 Verified: these names match the `SUB`/`FUNCTION` names in the text exactly,
@@ -181,7 +181,7 @@ EOF with no gaps.
 
 A procedure section starts at the run of comment lines immediately above its
 `SUB`/`FUNCTION` in the source, not at the keyword. Verified: with that
-rule, `line_count` matches the text for every procedure in all 57 files --
+rule, `line_count` matches the text for every procedure in all 57 files,
 including `PROJECT2`'s `MarkTest` and `BondCalc`, which look four lines short
 otherwise.
 
@@ -207,7 +207,7 @@ Two flag bits are used:
 - `0x001` -- the indentation is in the following word rather than in the
   header's own field. That word holds a raw space count when the indent is 32
   or more, and is otherwise a header-shaped word (`indent << 10`). Why small
-  indents sometimes take the escape is not understood, but both forms decode
+  indents sometimes take the escape isn't understood, but both forms decode
   unambiguously: low ten bits set means a raw count.
 
 A header is recognisable because no opcode has zero in its low ten bits apart
@@ -220,7 +220,7 @@ contain and which is what exposed the escape in the first place.
 
 ### Statements
 
-Statements are stored in reverse Polish -- operands first, then the operator.
+Statements are stored in reverse Polish: operands first, then the operator.
 `Desc$ = SPACE$(80)` is
 
     PUSH_INT 80 | SPACE$ | STORE$ Desc
@@ -261,7 +261,7 @@ verbatim.
 
 ### The dotted name marker
 
-`0017` is not a statement. It is a one-word trailer on a line that names an
+`0017` isn't a statement. It's a one-word trailer on a line that names an
 identifier containing a period, such as `Press.Any.Key` or `A.Var%`. It takes
 no operands, produces no text, and appears exactly once at the end of such a
 line however many dotted names the line uses. It occurs 131 times across the
@@ -285,7 +285,7 @@ appears in files touched in the editor: it looked that way only because the
 four corpus files with dotted names happened also to be the four that had been
 edited.
 
-### Reserved words that are not statements
+### Reserved words that aren't statements
 
 `SIGNAL` and `LOCAL` appear in the 4.5 keyword index but have no syntax in 4.5.
 QB parses neither and stores both lines as raw source text, which is the same
@@ -293,13 +293,13 @@ path a line with a genuine syntax error takes. They round-trip unchanged.
 
 ### Untokenized lines
 
-A tokenized file can contain lines that were never tokenized. When QB cannot
+A tokenized file can contain lines that were never tokenized. When QB can't
 parse a line it stores the source verbatim under opcode `000a`, in the same
 `[u16 field][text]` shape a comment uses. A detokenizer has to emit those back
 as they are.
 
 `TYPES.BAS` shows it: its `TYPE` member is called `Name`, which is the QB
-`NAME` statement, so the declaration was rejected -- and with it every later
+`NAME` statement, so the declaration was rejected, and with it every later
 line mentioning `Solo.Name`. `REDIM PRESERVE` went the same way; QB 4.5 has no
 `PRESERVE`. Verified: every `000a` payload in the corpus appears verbatim
 in QB's text output.
@@ -309,31 +309,31 @@ in QB's text output.
 Comment text is run-length encoded: `0x0d <count> <char>` stands for
 `count` copies of `char`, which is how `TORUS` stores its banner comments.
 The comment opcode's payload is a leading word followed by the text, and that
-word is the column the apostrophe sits at -- which is what lets QB put an
+word is the column the apostrophe sits at, which is what lets QB put an
 inline `X = 1    ' note` back where it was.
 
 Verified: 458 comments across the corpus expand to exactly the text QB
 emitted, and the column matches the position of the quote on 218 of the 220
 lines that can be checked. The two exceptions are `DIM ... AS <type>` lines,
-where the same opcode carries a payload that is not source text at all -- its
-leading word is 1 and its body contains NUL bytes. That form is not understood
+where the same opcode carries a payload that isn't source text at all. Its
+leading word is 1 and its body contains NUL bytes. That form isn't understood
 yet, so callers test for NUL before treating a payload as text.
 
-A comment's payload is padded to an even length with a space, and QB does not
+A comment's payload is padded to an even length with a space, and QB doesn't
 write that pad back out, so a stored comment can be one character longer at
 the right than the line it produced. Only four comments in the corpus hit it.
 Trailing whitespace is otherwise kept exactly.
 
 ### Jump targets are filled in by running the program
 
-Control-flow operands -- the target on `IF ... THEN`, `ELSE`, loop ends -- are
+Control-flow operands (the target on `IF ... THEN`, `ELSE`, loop ends) are
 zero in a file that has been loaded from text and saved without running.
 QB back-patches them when it compiles.
 
 Verified: `samples/EDIT1.BAS` saved after pressing F5 is `TRAIL1` saved
 without running, and
 the two token streams differ in exactly one word: the `IF`'s target, 0 before
-and 116 after. This matters mostly as a warning -- an unresolved target is not
+and 116 after. This matters mostly as a warning, since an unresolved target isn't
 a decoding error.
 
 ### DEFtype records
@@ -402,7 +402,7 @@ with no trailing word, and its arguments are already in source order.
 
 ### Parentheses are stored, not worked out from precedence
 
-There is no precedence table to reconstruct. QB stores the parentheses the
+There's no precedence table to reconstruct. QB stores the parentheses the
 programmer wrote as an explicit opcode (`016e`), redundant ones included, so
 rendering an expression is just a stack walk. `DRAWSCR1`'s
 
@@ -433,19 +433,19 @@ a `SUB` or `FUNCTION` definition omits them.
 
 ### Layout
 
-QB writes the module text first, then the procedures sorted by name --
+QB writes the module text first, then the procedures sorted by name,
 not in the order the sections sit in the file. Each section is followed by a
 blank line, unless it already ended with one.
 
 The `DEFtype` record at the head of each procedure is counted as a line but is
 printed only when it *changes* the default type. `TORUS` shows both halves: its
 procedures all carry a copy of the module's `DEFINT A-Z` and stay silent, while
-`TorusCalc` carries no record at all -- meaning the language default -- so QB
+`TorusCalc` carries no record at all (meaning the language default) so QB
 writes `DEFSNG A-Z` before it and `DEFINT A-Z` again before the next one.
 
-A statement written with an optional argument it did not supply keeps the space
-where the argument would have gone. That is why `CLS : END` has a space before
-the colon and `DO: LOOP` does not, and why a lone `CLS` needs its trailing
+A statement written with an optional argument it didn't supply keeps the space
+where the argument would have gone. That's why `CLS : END` has a space before
+the colon and `DO: LOOP` doesn't, and why a lone `CLS` needs its trailing
 space trimmed: QB trims trailing whitespace from a line that has content, but
 leaves it on a line that is only whitespace.
 
@@ -462,11 +462,11 @@ byte, the largest of them 2,386 lines, and all 12,708 lines overall.
 
 Cross-checked against the 224 keywords in the QB 4.5 help index, every
 documented statement and function is either an identified opcode or handled by
-one of the encoding rules. The three remaining index entries are not language
+one of the encoding rules. The three remaining index entries aren't language
 keywords: `ABSOLUTE`, `INTERRUPT` and `INTERRUPTX` are routines in `QB.QLB`
 that reach the file as ordinary `CALL` targets.
 
-Keyword coverage is not the same as coverage of the forms a keyword can take,
+Keyword coverage isn't the same as coverage of the forms a keyword can take,
 and that is where the real gaps were. QB gives most statements a separate
 opcode per argument count: `MID$` as a statement is `00c5` with two arguments
 and `00c6` with three, `WAIT` is `0077` or `0078`, `GET #` is `00b1` or `00b2`
@@ -476,7 +476,7 @@ their bare form. Functions do the same: `INSTR`, `LBOUND`, `UBOUND`, `MID$`,
 `POINT`, `RND` and `SCREEN` all have one opcode per argument count.
 
 The opcode table is dense enough that the holes in it are a usable map of what
-has not been reached, and working through them is what found most of the
+hasn't been reached, and working through them is what found most of the
 above. The statement range is now 242 of 256 assigned and the function range
 127 of 128, the one hole there being an unused slot rather than a missing
 name.
@@ -492,15 +492,15 @@ for everything else (BEEP through WRITE). Functions run in one block from
 `00ef` had to be `TIME$` because it sits between `SYSTEM` and `TROFF`. Both
 turned out to be right.
 
-Nine of the remaining statement holes cannot be opcodes at all: everything
+Nine of the remaining statement holes can't be opcodes at all: everything
 below `000a` is line-header space, which the decoder has to read as such and
-which sends QB into a loop if it is handed one as a statement. `0013` and
+which sends QB into a loop if it's handed one as a statement. `0013` and
 `0014` behave the same way. That leaves three genuinely unassigned, and
 "Known unknowns" below says what is known about each.
 
 ### Asking QB directly
 
-Once there is a writer, an unidentified opcode does not have to be hunted for
+Once there's a writer, an unidentified opcode doesn't have to be hunted for
 in real source. A file can be built around it and handed to QB, and whatever
 QB writes back out is the answer.
 
@@ -524,27 +524,27 @@ after it. That matches where the alphabetical order puts them.
 
 Two cautions. Put each opcode in its own file, or at least expect everything
 after a misbehaving one to be lost: an opcode that takes more operands than
-the probe supplies eats the next line. And some values are not statements at
-all -- `0002` sent QB into a loop that wrote a 311MB file before it was
-stopped -- so check the output size before reading it.
+the probe supplies eats the next line. And some values aren't statements at
+all. `0002` sent QB into a loop that wrote a 311MB file before it was
+stopped, so check the output size before reading it.
 
 This is what identified `004b`, `005a`, `005c`, `005f`, `0098`, `00d1`,
-`00dc`, `0024` and `0025`. The forms are not established, only the keywords,
+`00dc`, `0024` and `0025`. The forms aren't established, only the keywords,
 so the table renders them like the neighbouring variant of the same statement.
 
 The same probe works against `QBX.EXE`, the BASIC 7 PDS editor, which reads a
-QuickBASIC 4.5 file and writes the same text back. That is worth doing for any
-opcode 4.5 will not render, because the later product knows keywords 4.5 does
-not. `0030` is the case that proves it: 4.5 documents `SIGNAL` as a reserved
-word, refuses to parse `SIGNAL ON`, and will not render the opcode, yet keeps
+QuickBASIC 4.5 file and writes the same text back. That's worth doing for any
+opcode 4.5 won't render, because the later product knows keywords 4.5
+doesn't. `0030` shows why: 4.5 documents `SIGNAL` as a reserved
+word, refuses to parse `SIGNAL ON`, and won't render the opcode, yet keeps
 the slot at the position alphabetical order demands, between `PLAY` and
 `STRIG`. Handed the same file, PDS writes `SIGNAL()`.
 
 ## Writing a file
 
 `tokenize.py` goes the other way: source text in, a QuickBASIC 4.5 binary out.
-It is the part of this work that checks the rest, because a reader may skip a
-field it has not worked out and a writer may not.
+It checks the rest of the work, since a reader can skip a field it hasn't
+worked out and still look correct.
 
 The split is the same as the format's. `lex.py` and `parse.py` turn one line
 into the sequence of instructions QB would have stored, `assemble.py` picks
@@ -555,13 +555,13 @@ into sections, gives each its header word, and hands the result to
 Three things need the whole program rather than one line:
 
 - **Record variables.** A period is an ordinary name character, so nothing in
-  `Disk.Sectors` says whether it is one name or a field of `Disk`. Only the
+  `Disk.Sectors` says whether it's one name or a field of `Disk`. Only the
   declarations say, so they are read first.
 - **Sections.** Each `SUB` and `FUNCTION` is stored separately, and a comment
   block written directly above one goes with it: section membership is the
   only thing a comment has, and that is where QB puts it.
 - **Default types.** A procedure records the `DEF<type>` state it inherited,
-  in a line that carries nothing else and is not written back out as text. A
+  in a line that carries nothing else and isn't written back out as text. A
   `DEF<type>` line between two sections in a text file is that record rather
   than a statement.
 
@@ -572,7 +572,7 @@ chosen match the ones QuickBASIC stored on all 10,876 lines it tokenized.
 Eight files differ, none of them about tokenizing:
 
 - Two comment lines that end in spaces. The payload is padded to an even
-  length with a space and the reader cannot tell a pad from a written one, so
+  length with a space and the reader can't tell a pad from a written one, so
   a comment can lose one space on the way through.
 - Five files of manual text. Their prose pages are stored as untokenized
   lines because QB refused them; this parser is more forgiving and tokenizes
@@ -582,14 +582,14 @@ Eight files differ, none of them about tokenizing:
   sections of their own.
 
 Bucket placement is the one field not reproduced. The hash QB uses for names
-is not known, so every name goes in one chain. QB rebuilds its own lookup when
+isn't known, so every name goes in one chain. QB rebuilds its own lookup when
 it loads a program and reads such a file exactly as it reads a normal one,
-which is how the placement came to be testable in the first place.
+which is what made the placement safe to leave alone.
 
 ## Known unknowns
 
 What follows is everything still open, and for the opcodes it says what kind
-of thing each one is even where the name is not known.
+of thing each one is even where the name isn't known.
 
 **Opcodes.** The statement range is 245 of 256 assigned, the function range
 127 of 128. What is left divides into three groups.
@@ -597,9 +597,9 @@ of thing each one is even where the name is not known.
 - Nine values below `000a` are structural rather than statements. `0000`,
   `0001`, `0004` and `0005` are line headers the decoder has to read as such,
   `0002` and `0003` are the two that mark an included line, and handing QB any
-  of them as a statement sends it into a loop, writing lines until it is
+  of them as a statement sends it into a loop, writing lines until it's
   stopped. The rest of that range is almost certainly the same.
-- `0013` and `0014` behave exactly like `0002`, so they are not statements
+- `0013` and `0014` behave exactly like `0002`, so they aren't statements
   either.
 - `0034`, `0035` and `0099` belong to `$INCLUDE`, which nothing in the corpus
   uses. See below.
@@ -634,7 +634,7 @@ two are "used in $INCLUDEd lines".
 
 Two things corroborate it here. `0099` sits immediately below `009a`, the
 `BEEP` that opens the alphabetical run through to `WRITE`, which is where
-something that is not a keyword belongs and nowhere a keyword could go. And it
+something that isn't a keyword belongs and nowhere a keyword could go. And it
 explains the refusals: `0099` wants a string payload, and it was offered a
 bare opcode and then stack operands, neither of which it can read.
 
@@ -642,11 +642,11 @@ Not confirmed by experiment here. The check is a five-minute one for anyone
 with a DOS setup: save a program with an `$INCLUDE` in QuickBASIC 4.5, and a
 labelled line in the included file, then look for `0099` and `0034`. Until
 that is done this is two other projects' reading rather than a result, and
-`tokens.py` does not carry these three.
+`tokens.py` doesn't carry these three.
 
 [jeredw/qbc]: https://github.com/jeredw/qbc
 
-The one unassigned function code, `0108`, is not a missing function. It fits
+The one unassigned function code, `0108`, isn't a missing function. It fits
 the type-conversion family, whose members have `08` as their low byte and a
 high byte one more than a multiple of four; the high byte indexes the target
 type, 1 `CINT` through 4 `CDBL`. `0108` is index 0, meaning no type, and
@@ -666,29 +666,28 @@ QuickBASIC 4.5 writes is the contract.
 
 Neither the opcodes still unidentified nor these three appear anywhere in the
 corpus: 57 files and 12,708 lines, including programs written by other people.
-They are holes no real program reaches, which is why source alone could never
-have closed them.
+No real program reaches them, so source alone was never going to close them.
 
 **Fields.**
 
 - The `DIM ... AS <type>` payload described above.
 - Header bytes `0x12`, `0x14`, `0x15`, `0x18` and `0x19` vary across the
-  corpus and are not understood. Everything else in `0x00`-`0x19` is constant,
+  corpus and aren't understood. Everything else in `0x00`-`0x19` is constant,
   including the words `0x0181` at `0x06` and `0x0182` at `0x08`, which are
   fixed values rather than references to anything. `0x13` records editor
   provenance and `0x1a` is the code reference.
 - The four `head` words and `unknown_c` in the section trailer.
 - The hash QB computes for a name. The hash for numeric labels is known; this
-  one is not, and a broad search of the obvious rolling-hash families found
-  nothing. It does not matter for writing a file, since QB rebuilds its own
+  one isn't, and a broad search of the obvious rolling-hash families found
+  nothing. It doesn't matter for writing a file, since QB rebuilds its own
   lookup on load.
 - `OPEN`'s trailing word is described above; only bit 16 of its low byte and
-  bit `0x08` of its high byte have not been seen.
+  bit `0x08` of its high byte haven't been seen.
 - The trailing word on statements like `LOCATE` and `COLOR` is twice the
-  argument count, but on `LINE` it is the `B`/`BF` shape flag and on `PUT` the
-  raster action, so it is statement-specific rather than a general count.
+  argument count, but on `LINE` it's the `B`/`BF` shape flag and on `PUT` the
+  raster action, so it's statement-specific rather than a general count.
 
-**Forms that cannot be told apart.** `LOCK #1, TO 32` and `LOCK #1, 1 TO 32`
+**Forms that can't be told apart.** `LOCK #1, TO 32` and `LOCK #1, 1 TO 32`
 produce the same tokens, so the first comes back as the second. Nothing in the
 stored form distinguishes an omitted lower bound from an explicit 1.
 
@@ -698,20 +697,20 @@ header lines in the corpus that name a dotted procedure and carry no marker.
 Every one of the 13 is in a file that was edited in the QB editor, and none of
 the freshly loaded probe files shows the behaviour, so the likeliest reading is
 that the editor regenerates those header lines without re-applying the marker.
-That is a guess, not a result.
+That's a guess, not a result.
 
 Ruled out by experiment along the way, so nobody repeats them: trailing
 whitespace, a compile artefact, word padding, a trailing colon, and the
 procedure preamble kind byte.
 
-### A name written in a case the table does not hold
+### A name written in a case the table doesn't hold
 
 Normally a name is written back exactly as the name table spells it. One
 counterexample turned up while running the reference examples in concatenated
 batches: the table holds `Decimal`, carrying the statement-position flag, and
-QB writes the identifier as `decimal`. There is only one entry, confirmed by
+QB writes the identifier as `decimal`. There's only one entry, confirmed by
 walking the chains and by walking the table linearly and getting the same 237
-either way, so this is not two entries with different spellings.
+either way, so this isn't two entries with different spellings.
 
 It has never been seen in a real program. All 57 corpus files round-trip byte
 for byte, including 12,708 lines of code written by other people, so whatever
@@ -726,42 +725,42 @@ unrelated programs together.
 `samples/` closed the rest of the keyword set, and then the argument-count and
 bare forms of the statements, which is where the real gaps turned out to be.
 
-Four things closed the remainder, and they are worth naming because each one
-found something the previous could not:
+Four things closed the remainder, each finding something the one before it
+could not:
 
-- **A writer, and then a tokenizer.** Writing the format is a stronger check
-  than reading it, because it has to reproduce every field rather than skip
-  what it does not understand. Rebuilding all 57 corpus files byte for byte
+- **A writer, and then a tokenizer.** Writing the format checks more than
+  reading it does, since it has to reproduce every field rather than skip what
+  it doesn't understand. Rebuilding all 57 corpus files byte for byte
   exposed three fields the reader had glossed over: the procedure preamble
-  records `SUB` or `FUNCTION` and the return type, the trailer kind is not
-  always `0c02`, and there is a fixed 259-byte gap between the name table and
+  records `SUB` or `FUNCTION` and the return type, the trailer kind isn't
+  always `0c02`, and there's a fixed 259-byte gap between the name table and
   the first section. Going the whole way from source found a good deal more:
-  which statements mark their arguments and which do not, that a jump target
+  which statements mark their arguments and which don't, that a jump target
   is left empty until the program runs, that `LINE`, `CIRCLE`, `PSET`, `GET`
   and `PUT` each have an opcode per written form rather than a flag, and that
   a procedure carries the default types it inherited.
 - **Real programs by other people.** A NES emulator and both modules of an
   8086 emulator, 5,342 lines between them, found eleven faults in an afternoon
-  that fifty synthetic samples had not: tab indentation, the suffix rules for
+  that fifty synthetic samples hadn't: tab indentation, the suffix rules for
   long literals, the `DEF<type>` delta between sections, `EXIT DEF` and more.
 - **The reference examples.** `QB45ADVR.HLP` prints a worked program for 160
   statements. Running those through QB gave Microsoft's own code to check
   against, and revealed that both statement ranges are alphabetical, which
   makes a hole in the table predictable from the names either side of it.
-- **Asking QB, and then PDS.** Once there is a writer, an opcode can be handed
+- **Asking QB, and then PDS.** Once there's a writer, an opcode can be handed
   to the product rather than hunted for in source. QB 4.5 named seven that
   way. BASIC 7 PDS named two more that 4.5 keeps a slot for and refuses to
   print, `SIGNAL` and `CHDRIVE`, and confirmed `SHELL` has a function form the
-  quick reference does not mention.
+  quick reference doesn't mention.
 
 What would help now, in order:
 
 - **QuickBASIC 4.0 files.** Everything here is 4.5. The claim that 4.0 wrote a
   different variant is repeated from other projects' documentation, not
-  tested, which is the one place this document passes on something it has not
+  tested, which is the one place this document passes on something it hasn't
   checked.
-- **PDS-written files.** PDS reads 4.5 files correctly, but what it writes has
-  not been looked at.
+- **PDS-written files.** PDS reads 4.5 files correctly, but what it writes
+  hasn't been looked at.
 - **Confirming the `$INCLUDE` family.** `0002`, `0003`, `0034`, `0035` and
   `0099` are placed above on other projects' evidence and not on any run here,
   and no statement opcode is unaccounted for once they are. One saved program
