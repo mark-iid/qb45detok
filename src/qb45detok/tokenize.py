@@ -48,6 +48,19 @@ _COMMENT = re.compile(r"^\s*('|REM\b)", re.I)
 #: whenever the default types change from one to the next.
 _DEFTYPE = re.compile(r"^\s*DEF(INT|LNG|SNG|DBL|STR)\b", re.I)
 
+#: Words that only BASIC 7 PDS has. Source using one of these cannot be
+#: written as a QuickBASIC 4.5 file, which is the only thing this writes.
+PDS_ONLY = (
+    "CURRENCY", "DEFCUR", "CCUR", "CVC", "MKC$", "CURDIR$", "DIR$", "CHDRIVE",
+    "SSEG", "SSEGADD", "BEGINTRANS", "CHECKPOINT", "COMMITTRANS", "ROLLBACK",
+    "SAVEPOINT", "CREATEINDEX", "DELETEINDEX", "DELETETABLE", "SETINDEX",
+    "GETINDEX$", "MOVEFIRST", "MOVELAST", "MOVENEXT", "MOVEPREVIOUS",
+    "SEEKEQ", "SEEKGE", "SEEKGT", "RETRIEVE",
+)
+_PDS_WORD = re.compile(
+    r"(?<![\w.$])(" + "|".join(w.replace("$", r"\$") for w in PDS_ONLY)
+    + r")(?![\w.])", re.I)
+
 #: A metacommand comment, which is not an ordinary comment: it belongs to
 #: the section it was written in.
 _META = re.compile(r"^\s*(?:'|REM)\s*\$(?:STATIC|DYNAMIC)\b", re.I)
@@ -148,6 +161,18 @@ def record_variables(text: str) -> Set[str]:
     return names
 
 
+def pds_words(text: str) -> Set[str]:
+    """PDS-only words used as code, ignoring comments and string literals."""
+    found: Set[str] = set()
+    for line in text.splitlines():
+        body = line.split("'", 1)[0]
+        body = re.sub(r'"[^"]*"', '""', body)
+        if re.match(r"\s*REM\b", body, re.I):
+            continue
+        found.update(m.group(1).upper() for m in _PDS_WORD.finditer(body))
+    return found
+
+
 def indent_of(line: str) -> int:
     """The column the first non-blank character sits in, tabs expanded."""
     column = 0
@@ -179,6 +204,13 @@ class Tokenizer:
             self.asm.writer.header[0x13] |= self.TABS
 
     def build(self) -> bytes:
+        found = pds_words(self.text)
+        if found:
+            raise PdsSource(
+                "this looks like BASIC 7 PDS source, and the writer only "
+                "produces QuickBASIC 4.5 files: "
+                + ", ".join(sorted(found))
+            )
         for part in split_sections(self.text):
             self.asm.writer.sections.append(self._section(part))
         return self.asm.writer.build()
@@ -378,6 +410,15 @@ _RETURN_TYPE = {"%": 1, "&": 2, "!": 3, "#": 4, "$": 5}
 
 class IncludeNotFound(FileNotFoundError):
     """Raised when an ``$INCLUDE`` names a file that is not beside the source."""
+
+
+class PdsSource(ValueError):
+    """Raised when source uses BASIC 7 PDS constructs the writer cannot store.
+
+    The writer produces QuickBASIC 4.5 files. PDS numbers its types
+    differently and has keywords 4.5 has no opcode for, so writing this
+    source as a 4.5 file would silently change what it means.
+    """
 
 
 def tokenize(text: str, base_dir=None) -> bytes:

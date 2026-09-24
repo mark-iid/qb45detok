@@ -116,3 +116,30 @@ def test_rollback_has_three_forms():
     assert tokens.PDS_OPS[0x019C].text == "ROLLBACK"
     assert tokens.PDS_OPS[0x019D].arity == 1        # ROLLBACK <savepoint>
     assert tokens.PDS_OPS[0x019E].text == "ROLLBACK ALL"
+
+
+# -- the two things that write ------------------------------------------
+
+def test_the_writer_refuses_pds_source_rather_than_downgrading_it():
+    """It only makes 4.5 files, and a 4.5 file cannot hold CURRENCY."""
+    from qb45detok.tokenize import PdsSource, tokenize
+    with pytest.raises(PdsSource, match="CURRENCY"):
+        tokenize("DIM Money AS CURRENCY\nEND")
+
+
+def test_a_pds_word_in_a_string_or_comment_is_not_source():
+    from qb45detok.tokenize import pds_words
+    assert pds_words('PRINT "ROLLBACK"') == set()
+    assert pds_words("X = 1 ' ROLLBACK and CHDRIVE") == set()
+    assert pds_words("REM CURRENCY") == set()
+    assert pds_words("ROLLBACK") == {"ROLLBACK"}
+
+
+@requires_pds
+def test_lint_says_pds_is_not_supported_at_all():
+    """It used to say a PDS file needed no changes, which is the worst answer."""
+    from qb45detok.lint import BLOCKED, check
+    found = check(BinFile.from_path(CORPUS_PDS_BIN / "PDSISM2.BAS"))
+    assert found and found[0].severity == BLOCKED
+    assert "does not support" in found[0].advice
+    assert any("ISAM" in f.advice for f in found)

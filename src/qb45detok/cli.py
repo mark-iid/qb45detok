@@ -11,7 +11,7 @@ from .decode import decode_file, decode_section
 from .render import Renderer
 from .quickhelp import HelpFile, QuickHelpError
 from .lint import check, report
-from .tokenize import tokenize
+from .tokenize import PdsSource, tokenize
 from .triage import scan
 from .reader import BinFile, ParseError, REF_BASE, Section
 
@@ -352,7 +352,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
-    except ParseError as exc:
+    except (ParseError, PdsSource) as exc:
         print(f"qb45detok: {args.file}: {exc}", file=sys.stderr)
         return 1
     except OSError as exc:

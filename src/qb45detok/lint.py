@@ -1,7 +1,9 @@
-"""Report what in a QuickBASIC 4.5 program will not survive a port to QB64.
+"""Report what in a QuickBASIC program will not survive a port to QB64.
 
 QB64 Phoenix Edition aims at QuickBASIC 4.5 compatibility and gets most of the
-way, but a couple of dozen keywords are missing. The awkward part is what its
+way, but a couple of dozen keywords are missing. It does not aim at BASIC 7
+PDS at all, and says so, so a PDS program is reported as blocked before
+anything else is looked at. The awkward part is what its
 own documentation says about them: "older code that uses these keywords won't
 generate errors, as these are ignored by the compiler." A program using them
 builds and runs, and quietly does something else.
@@ -23,15 +25,17 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from .decode import DecodedSection, Line, decode_file
-from .reader import BinFile
+from . import tokens
+from .reader import PDS71, BinFile
 from .render import Renderer
 
 #: What happens to a program that uses the thing.
+BLOCKED = "blocked"      #: QB64 does not take this at all
 IGNORED = "ignored"      #: compiles, does nothing, no diagnostic from QB64
 REWORK = "rework"        #: has to be rewritten before it will compile
 PLATFORM = "platform"    #: fine on Windows, a stub on Linux and macOS
 
-SEVERITY_ORDER = {IGNORED: 0, REWORK: 1, PLATFORM: 2}
+SEVERITY_ORDER = {BLOCKED: 0, IGNORED: 1, REWORK: 2, PLATFORM: 3}
 
 #: Opcode mnemonic to (severity, what to call it, what to do about it).
 RULES: Dict[str, Tuple[str, str, str]] = {
@@ -95,6 +99,30 @@ QLB_ROUTINES = {
 #: Device names that OPEN accepts in QuickBASIC and QB64 does not.
 DEVICES = ("LPT1", "LPT2", "LPT3", "CON", "KYBD", "SCRN")
 
+#: What to say about the things only BASIC 7 PDS has. QB64's own note is
+#: "PDS (7.1) is not supported", so none of this ports as written.
+_ISAM = ("QB64 has no ISAM. The database will have to be rebuilt on something "
+         "else, which is a rewrite rather than a port")
+_CURRENCY = ("QB64 has no CURRENCY type. _INTEGER64 scaled by 10000 is the "
+             "usual replacement, and it is not a drop-in one")
+PDS_RULES: Dict[str, Tuple[str, str, str]] = {
+    "CURDIR$": (BLOCKED, "CURDIR$", "use _CWD$"),
+    "DIR$": (BLOCKED, "DIR$", "use _FILES$"),
+    "CHDRIVE": (BLOCKED, "CHDRIVE", "QB64 has no drive letters on Linux or "
+                "macOS; CHDIR takes a whole path"),
+    "CCUR": (BLOCKED, "CCUR", _CURRENCY),
+    "CVC": (BLOCKED, "CVC", _CURRENCY),
+    "MKC$": (BLOCKED, "MKC$", _CURRENCY),
+    "SSEG": (BLOCKED, "SSEG", "far strings do not exist; QB64 strings have no "
+             "segment"),
+    "SSEGADD": (BLOCKED, "SSEGADD", "far strings do not exist; QB64 strings "
+                "have no segment"),
+    "ISAM_MOVE": (BLOCKED, "MOVEFIRST / MOVELAST / MOVENEXT / MOVEPREVIOUS",
+                  _ISAM),
+    "ISAM_SEEK": (BLOCKED, "SEEKEQ / SEEKGE / SEEKGT", _ISAM),
+    "OPEN_ISAM": (BLOCKED, "OPEN ... FOR ISAM", _ISAM),
+}
+
 
 @dataclass
 class Finding:
@@ -135,10 +163,28 @@ def _call_target(instr, bf: BinFile) -> Optional[str]:
     return entry.name if entry is not None else None
 
 
+def _pds_rules() -> Dict[str, Tuple[str, str, str]]:
+    """One rule per PDS-only opcode, so none of them goes unreported."""
+    rules = dict(PDS_RULES)
+    for op in tokens.PDS_OPS.values():
+        rules.setdefault(op.mnemonic,
+                         (BLOCKED, op.text or op.mnemonic, _ISAM))
+    return rules
+
+
 def check(bf: BinFile) -> List[Finding]:
     """Everything in a program that QB64 will not take as written."""
     out: List[Finding] = []
     renderer = Renderer(bf)
+    pds = bf.layout is PDS71
+    rules = dict(RULES)
+    if pds:
+        # QB64 aims at 4.5 and says so: "PDS (7.1) is not supported".
+        rules.update(_pds_rules())
+        out.append(Finding(None, 1, f"saved by {bf.layout.name}", bf.layout.name,
+                           BLOCKED,
+                           "QB64 targets QuickBASIC 4.5 and does not support "
+                           "PDS. Everything below is on top of that"))
     for ds in decode_file(bf):
         text = renderer.section(ds)
         lines = _visible(ds)
@@ -146,7 +192,7 @@ def check(bf: BinFile) -> List[Finding]:
             node, source = line
             seen = set()
             for instr in node.instrs:
-                rule = RULES.get(instr.mnemonic)
+                rule = rules.get(instr.mnemonic)
                 if rule is not None and instr.mnemonic not in seen:
                     seen.add(instr.mnemonic)
                     severity, keyword, advice = rule
@@ -194,6 +240,7 @@ def report(findings: Sequence[Finding]) -> List[str]:
     order = sorted(findings, key=lambda f: (SEVERITY_ORDER[f.severity],
                                             f.section or "", f.number))
     headings = {
+        BLOCKED: "QB64 will not take these at all.",
         IGNORED: "QB64 ignores these. The program will build and run, and do "
                  "something else.",
         REWORK: "These have to be rewritten before it will build.",
@@ -211,9 +258,9 @@ def report(findings: Sequence[Finding]) -> List[str]:
         out.append(f"  {'':24} {f.text[:60]}")
         out.append(f"  {'':24} -> {f.advice}")
     counts = {s: sum(1 for f in findings if f.severity == s)
-              for s in (IGNORED, REWORK, PLATFORM)}
+              for s in (BLOCKED, IGNORED, REWORK, PLATFORM)}
     out.append("")
-    out.append(f"{len(findings)} to look at: {counts[IGNORED]} ignored "
-               f"silently, {counts[REWORK]} needing a rewrite, "
-               f"{counts[PLATFORM]} platform-specific.")
+    out.append(f"{len(findings)} to look at: {counts[BLOCKED]} not supported, "
+               f"{counts[IGNORED]} ignored silently, {counts[REWORK]} needing "
+               f"a rewrite, {counts[PLATFORM]} platform-specific.")
     return out

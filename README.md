@@ -161,7 +161,8 @@ These have to be rewritten before it will build.
 
 It takes either format, and exits non-zero when it finds something. The rules
 come from the list QB64 ships in `internal/help/`, not from my recollection of
-what it supports.
+what it supports. That list opens with "PDS (7.1) is not supported", so a
+BASIC 7 program is reported as blocked in full rather than line by line.
 
 The check is made against the tokens rather than the text, which is why it
 lives here. QuickBASIC recorded what it understood each line to mean, so a
@@ -184,6 +185,11 @@ directly.
 ```
 qb45detok detok OLDPROG.BAS      # it works out which product wrote the file
 ```
+
+Reading only. `tok` writes QuickBASIC 4.5 files, so it refuses PDS source
+rather than quietly writing something that means a different thing, and `lint`
+reports a PDS program as blocked before it looks at anything else, because QB64
+does not target PDS at all.
 
 Four differences, all of them small, and `docs/format.md` has the detail:
 
