@@ -84,6 +84,7 @@ PDS_OPS = {
     0x0184: _op(0x0184, "DIR$", (), 1, "DIR$", "func"),
     0x0187: _op(0x0187, "CVC", (), 1, "CVC", "func"),
     0x0189: _op(0x0189, "MKC$", (), 1, "MKC$", "func"),
+    0x0186: _op(0x0186, "BOF", (), 1, "BOF", "func"),
     0x018B: _op(0x018B, "SSEG", (), 1, "SSEG", "func"),
     0x018C: _op(0x018C, "SSEGADD", (), 1, "SSEGADD", "func"),
     #: The conversion family's index 5, which 4.5 leaves unused.
@@ -91,7 +92,34 @@ PDS_OPS = {
     #: 4.5 keeps the slot and refuses to print it, so the base table has it
     #: as a silent marker. In PDS it is a statement that takes a drive.
     0x017F: _op(0x017F, "CHDRIVE", (), 1, "CHDRIVE", "stmt"),
+
+    #: The ISAM statements. Read off `samples/PDSISM2.BAS`, which puts each
+    #: one between two lines of a known shape so that the extent of an opcode
+    #: whose operand count was not yet known could still be measured.
+    0x018E: _op(0x018E, "BEGINTRANS", (), 0, "BEGINTRANS", "stmt"),
+    0x018F: _op(0x018F, "CHECKPOINT", (), 0, "CHECKPOINT", "stmt"),
+    0x0190: _op(0x0190, "COMMITTRANS", (), 0, "COMMITTRANS", "stmt"),
+    0x019C: _op(0x019C, "ROLLBACK", (), 0, "ROLLBACK", "stmt"),
+    0x0191: _op(0x0191, "CREATEINDEX", ("u16",), 4, "CREATEINDEX", "stmt"),
+    0x01A1: _op(0x01A1, "SETINDEX", (), 2, "SETINDEX", "stmt"),
+    0x0193: _op(0x0193, "DELETEINDEX", (), 2, "DELETEINDEX", "stmt"),
+    0x0194: _op(0x0194, "DELETETABLE", (), 2, "DELETETABLE", "stmt"),
+    0x0197: _op(0x0197, "INSERT", (), 2, "INSERT", "stmt"),
+    0x019B: _op(0x019B, "RETRIEVE", (), 2, "RETRIEVE", "stmt"),
+    0x01A6: _op(0x01A6, "UPDATE", (), 2, "UPDATE", "stmt"),
+    0x0192: _op(0x0192, "DELETE", (), 1, "DELETE", "stmt"),
+    #: OPEN ... FOR ISAM, which names the record type the table holds. The
+    #: first operand has only been seen as zero.
+    0x019A: _op(0x019A, "OPEN_ISAM", ("u16", "ref"), 3, "OPEN", "stmt"),
+    #: One opcode each for the two families, with the keyword in the operand.
+    0x0198: _op(0x0198, "ISAM_MOVE", ("u16",), 1, None, "stmt"),
+    0x019F: _op(0x019F, "ISAM_SEEK", ("u16", "u16"), 2, None, "stmt"),
 }
+
+#: Which way an ISAM_MOVE moves, and which comparison an ISAM_SEEK wants.
+#: Both number their family in steps of four.
+ISAM_MOVES = {0: "MOVEFIRST", 4: "MOVELAST", 8: "MOVENEXT", 12: "MOVEPREVIOUS"}
+ISAM_SEEKS = {0: "SEEKEQ", 4: "SEEKGE", 8: "SEEKGT"}
 
 
 #: Opcodes whose ``str`` payload is a procedure signature.
@@ -604,9 +632,16 @@ _OPS = [
 OPS: Dict[int, Op] = {o.code: o for o in _OPS}
 
 
-def variable_op(code: int) -> Optional[Op]:
+#: The same table for BASIC 7 PDS, which gives CURRENCY the slot at 20 and
+#: moves STRING up to 24, exactly as it does with the small type codes.
+PDS_TYPE_BY_HIGH_BYTE = dict(TYPE_BY_HIGH_BYTE)
+PDS_TYPE_BY_HIGH_BYTE[20] = "@"
+PDS_TYPE_BY_HIGH_BYTE[24] = "$"
+
+
+def variable_op(code: int, types: Optional[Dict[int, str]] = None) -> Optional[Op]:
     """Synthesise the entry for a typed variable load/store/array opcode."""
-    suffix = TYPE_BY_HIGH_BYTE.get(code >> 8)
+    suffix = (types or TYPE_BY_HIGH_BYTE).get(code >> 8)
     if suffix is None:
         return None
     low = code & 0xFF
@@ -652,9 +687,14 @@ def constant_op(code: int) -> Optional[Op]:
     return _op(code, f"PUSH_{value}", (), 0, str(value), "literal")
 
 
-def lookup(code: int) -> Optional[Op]:
-    """The opcode's table entry, or ``None`` if it is not yet identified."""
+def lookup(code: int, types: Optional[Dict[int, str]] = None) -> Optional[Op]:
+    """The opcode's table entry, or ``None`` if it is not yet identified.
+
+    ``types`` picks the table the variable-access family is typed by, which
+    BASIC 7 PDS numbers differently from QuickBASIC 4.5.
+    """
     op = OPS.get(code)
     if op is not None:
         return op
-    return variable_op(code) or constant_op(code) or convert_op(code)
+    return (variable_op(code, types) or constant_op(code)
+            or convert_op(code))

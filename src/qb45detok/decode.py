@@ -251,6 +251,8 @@ def decode_section(bf: BinFile, section: Section) -> DecodedSection:
     i = 0
     n = len(w)
 
+    types = (tokens.PDS_TYPE_BY_HIGH_BYTE
+             if bf.layout.version == PDS_VERSION else None)
     while i < n:
         if w[i] == tokens.END_OF_SECTION[0] and i + 1 < n and w[i + 1] == tokens.END_OF_SECTION[1]:
             break
@@ -300,7 +302,7 @@ def decode_section(bf: BinFile, section: Section) -> DecodedSection:
                 break
             if code == tokens.END_OF_SECTION[0] and i + 1 < n and w[i + 1] == tokens.END_OF_SECTION[1]:
                 break
-            op = tokens.lookup(code)
+            op = tokens.lookup(code, types)
             if bf.layout.version == PDS_VERSION:
                 # PDS prints things 4.5 keeps a slot for and will not render,
                 # so its own table wins where the two disagree.

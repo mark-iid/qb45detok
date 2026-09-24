@@ -400,6 +400,19 @@ class Renderer:
             elif mn == "REM_META":
                 # A comment written with the REM keyword rather than "'".
                 emit("REM" + (ins.text or ""))
+            elif mn == "OPEN_ISAM":
+                # OPEN <file> FOR ISAM <type> <table> AS #n
+                name, table, channel = pop(3)
+                emit(f"OPEN {name} FOR ISAM {self.name(ins.operands[1])} "
+                     f"{table} AS {channel}")
+            elif mn in ("ISAM_MOVE", "ISAM_SEEK"):
+                # One opcode covers the family and the first operand says
+                # which member it is, in steps of four.
+                table = (tokens.ISAM_MOVES if mn == "ISAM_MOVE"
+                         else tokens.ISAM_SEEKS)
+                keyword = table.get(ins.operands[0], mn)
+                args = pop(op.arity or 0)
+                emit(f"{keyword} {', '.join(args)}" if args else keyword)
             elif mn == "META_INCLUDE":
                 # The path is the payload, and it already carries the closing
                 # quote that the metacommand is written with.

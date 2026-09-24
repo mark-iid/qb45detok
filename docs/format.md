@@ -626,30 +626,69 @@ wrong quietly.
 in 4.5 and `[ref][mode][type][0000]` in PDS. The extra word is zero in every
 file seen and what it is for is not known.
 
-**Opcodes of its own.** Read off `samples/PDSKEY.BAS`, written to use the
-keywords PDS adds and saved through QBX:
+**The type high bytes move as well.** The variable-access family puts the type
+in the high byte, and PDS gives `@` the slot at 20 and moves `$` up to 24, the
+same shift the small type codes take. Without that, a PDS program calling a
+function that returns a string decodes as an unknown opcode.
 
-| Opcode | Keyword |
-|---|---|
-| `0181` | `CURDIR$` |
-| `0184` | `DIR$` |
-| `0187` | `CVC` |
-| `0189` | `MKC$` |
-| `018b` | `SSEG` |
-| `018c` | `SSEGADD` |
-| `1508` | `CCUR` |
-| `017f` | `CHDRIVE`, which 4.5 keeps a slot for and will not print |
+**Opcodes of its own.** Read off the samples written to produce them and saved
+through QBX. `PDSISM2.BAS` and `PDSFMT.BAS` put one statement between two lines
+of a known shape, so that an opcode whose operand count was not yet known could
+still have its extent measured.
+
+| Opcode | Keyword | Operand words |
+|---|---|---|
+| `017f` | `CHDRIVE`, which 4.5 keeps a slot for and will not print | |
+| `0181` | `CURDIR$` | |
+| `0184` | `DIR$` | |
+| `0186` | `BOF` | |
+| `0187` | `CVC` | |
+| `0189` | `MKC$` | |
+| `018b` | `SSEG` | |
+| `018c` | `SSEGADD` | |
+| `1508` | `CCUR` | |
+| `018e` | `BEGINTRANS` | |
+| `018f` | `CHECKPOINT` | |
+| `0190` | `COMMITTRANS` | |
+| `0191` | `CREATEINDEX` | 1 |
+| `0192` | `DELETE` | |
+| `0193` | `DELETEINDEX` | |
+| `0194` | `DELETETABLE` | |
+| `0197` | `INSERT` | |
+| `0198` | `MOVEFIRST`/`MOVELAST`/`MOVENEXT`/`MOVEPREVIOUS` | 1, the member |
+| `019a` | `OPEN ... FOR ISAM` | 2, the second naming the record type |
+| `019b` | `RETRIEVE` | |
+| `019c` | `ROLLBACK` | |
+| `019f` | `SEEKEQ`/`SEEKGE`/`SEEKGT` | 2, the first the comparison |
+| `01a1` | `SETINDEX` | |
+| `01a6` | `UPDATE` | |
+
+`0198` and `019f` each cover a family, with the member in the operand and
+numbered in steps of four: 0, 4, 8, 12 for `MOVEFIRST`, `MOVELAST`, `MOVENEXT`
+and `MOVEPREVIOUS`, and 0, 4, 8 for the three `SEEK`s.
 
 `1508` corrects something this document used to say. It fits the conversion
 family, low byte `08` and a high byte one more than a multiple of four, and
 the note here called index 5 an unused slot alongside `0108`. In PDS index 5
 is `CURRENCY`, so `1508` is `CCUR`. Only `0108`, index 0, is unused.
 
-The block from `0181` upward is contiguous and the gaps in it are PDS keywords
-not yet identified. PDS adds about fifty over 4.5, so most of them are still
-open. `STRINGADDRESS`, `STRINGLENGTH`, `STRINGASSIGN` and `STRINGRELEASE` are
-not among them: QBX tokenized those as ordinary array references and calls,
-so they are library routines rather than keywords.
+**Most of what the help index calls a PDS keyword has no opcode.** The index
+lists about seventy names PDS has and 4.5 does not, and the great majority are
+routines in its libraries rather than words in the language. QBX tokenizes them
+as ordinary calls, which is the same evidence either way:
+
+- the financial family, `PMT#`, `FV#`, `PV#`, `NPV#`, `IRR#`, `SLN#`, `SYD#`,
+  `DDB#`, `RATE#`, `NPER#`
+- the date and time family, `NOW#`, `DAY&`, `YEAR&`, `MONTH&`, `HOUR&`,
+  `MINUTE&`, `SECOND&`, `WEEKDAY&`, `DATESERIAL#`, `DATEVALUE#`,
+  `TIMESERIAL#`, `TIMEVALUE#`
+- the whole `FORMAT` family and `SETFORMATCC`
+- the far-string helpers `STRINGADDRESS`, `STRINGLENGTH`, `STRINGASSIGN` and
+  `STRINGRELEASE`
+
+`SAVEPOINT` and `GETINDEX$` are the two this has not settled. QBX refused both
+as written in `samples/PDSISAM.BAS` and kept them as text, so the syntax there
+is wrong rather than the keywords being absent.
 
 ## Known unknowns
 
@@ -859,10 +898,9 @@ What would help now, in order:
   different variant is repeated from other projects' documentation, not
   tested, which is the one place this document passes on something it hasn't
   checked.
-- **The rest of the PDS opcodes.** Seven are named and PDS adds about fifty
-  keywords, so the `0181` block is mostly unmapped. The method is the one that
-  found these: write a program that uses them, save it through QBX, read the
-  opcodes off. The ISAM verbs need the ISAM library loaded to tokenize.
+- **`SAVEPOINT` and `GETINDEX$`.** The two PDS keywords QBX would not accept
+  as written, so their opcodes are unknown. Everything else the help index
+  lists is either in the table above or a library routine.
 - **Byte-identical output from the tokenizer.** `INCL.BAS` comes back byte for
   byte apart from the hash fields, but it is a small program. Across the corpus
   most files still differ in length, mostly in how the name table is ordered

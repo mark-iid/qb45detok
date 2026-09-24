@@ -194,11 +194,14 @@ Four differences, all of them small, and `docs/format.md` has the detail:
 - two more bytes per parameter in a procedure signature
 - a block of opcodes of its own for the keywords PDS adds
 
-The opcode block is only partly mapped. Seven are named, read off a program
-written to use them: `CURDIR$`, `DIR$`, `CVC`, `MKC$`, `SSEG`, `SSEGADD` and
-`CCUR`, plus `CHDRIVE`, which 4.5 keeps a slot for and will not print. PDS adds
-about fifty keywords over 4.5, so there are more to find, and the gaps in the
-`0181` block say roughly where they are.
+Twenty-four of them are named, read off programs written to produce them: the
+ISAM statements, the currency conversions, `CURDIR$`, `DIR$`, `BOF`, `SSEG`,
+`SSEGADD`, and `CHDRIVE`, which 4.5 keeps a slot for and will not print. The
+help index lists about seventy names PDS has and 4.5 does not, but most of them
+turn out to be routines in its libraries rather than words in the language: the
+financial family, the date and time family, the whole of `FORMAT`, and the
+far-string helpers all tokenize as ordinary calls. `SAVEPOINT` and `GETINDEX$`
+are the two still open.
 
 ## Reading old data files
 
@@ -328,7 +331,7 @@ pytest
 ```
 
 Without a corpus the format-level tests still run and the rest skip, which is
-what happens in CI: 183 of them run there against 1,533 here, since most of
+what happens in CI: 192 of them run there against 1,561 here, since most of
 the suite is one test per corpus file.
 
 ## License

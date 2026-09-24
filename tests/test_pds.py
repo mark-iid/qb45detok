@@ -84,3 +84,21 @@ def test_every_opcode_in_a_pds_file_is_known(name):
 @requires_pds
 def test_triage_tells_the_two_apart():
     assert classify(CORPUS_PDS_BIN / PDS_NAMES[0]).kind == "BASIC 7 PDS"
+
+
+def test_the_isam_families_are_one_opcode_each():
+    """MOVE and SEEK put the member in an operand, numbered in fours."""
+    assert tokens.ISAM_MOVES == {0: "MOVEFIRST", 4: "MOVELAST",
+                                 8: "MOVENEXT", 12: "MOVEPREVIOUS"}
+    assert tokens.ISAM_SEEKS == {0: "SEEKEQ", 4: "SEEKGE", 8: "SEEKGT"}
+    assert tokens.PDS_OPS[0x0198].operands == ("u16",)
+    assert tokens.PDS_OPS[0x019F].operands == ("u16", "u16")
+
+
+def test_pds_moves_the_type_high_bytes_too():
+    """A function returning a string is 24 in PDS and 20 in 4.5."""
+    assert tokens.TYPE_BY_HIGH_BYTE[20] == "$"
+    assert tokens.PDS_TYPE_BY_HIGH_BYTE[20] == "@"
+    assert tokens.PDS_TYPE_BY_HIGH_BYTE[24] == "$"
+    assert tokens.lookup(0x180E) is None
+    assert tokens.lookup(0x180E, tokens.PDS_TYPE_BY_HIGH_BYTE).mnemonic == "ARRAY$"
