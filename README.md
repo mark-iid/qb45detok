@@ -116,9 +116,16 @@ detokenizes, tokenizes and detokenizes again to the same text, bar the eight
 cases `docs/format.md` sets out, and the opcodes chosen match the ones
 QuickBASIC stored on every one of the 10,876 lines it tokenized.
 
+QuickBASIC itself reads what this writes. Four programs tokenized here were
+handed back to QB 4.5, which loaded each one and saved it as text identical to
+what it had written from its own copy: a graphics program of eleven sections
+and 25 names, one with periods in its procedure names, one exercising every
+graphics statement, and one with an `$INCLUDE`.
+
 Bucket placement in the symbol table is the one thing not reproduced exactly:
 the hash QB uses for names is still unknown, so the writer puts everything in
-one chain. QB rebuilds its own lookup on load and reads such a file normally.
+one chain. That is what those four files test, and QB rebuilds its own lookup
+on load rather than trusting the one it was given.
 
 ## Reading old data files
 

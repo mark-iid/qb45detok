@@ -86,6 +86,10 @@ It also doesn't matter if you are writing a file. QB rebuilds its own lookup
 when it loads a program and doesn't check what it was given: a corpus file
 rewritten so that all four of its names sit in one chain in bucket 0, with the
 other 40 buckets empty, loads and re-saves with the source text unchanged.
+Four programs written from scratch by `tokenize.py`, which puts every name in
+bucket 0, were handed to QuickBASIC 4.5 and saved back as text: all four came
+back identical to what QB had written from its own copy. The largest,
+`DRAWSCR1`, is eleven sections and 25 names.
 
 - `0x6e`: reference one past the last name entry, i.e. the end of the name
   table. Verified: walking entries from `0x72` lands exactly here.
@@ -582,9 +586,10 @@ Eight files differ, none of them about tokenizing:
   sections of their own.
 
 Bucket placement is the one field not reproduced. The hash QB uses for names
-isn't known, so every name goes in one chain. QB rebuilds its own lookup when
-it loads a program and reads such a file exactly as it reads a normal one,
-which is what made the placement safe to leave alone.
+isn't known, so every name goes in one chain. That is not a problem in
+practice: QuickBASIC 4.5 rebuilds its own lookup when it loads a program, and
+four files written here have been loaded by QB and saved back as text
+unchanged. See the symbol table section.
 
 ## Known unknowns
 
