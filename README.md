@@ -254,7 +254,7 @@ pytest
 ```
 
 Without a corpus the format-level tests still run and the rest skip, which is
-what happens in CI: 157 of them run there against 1,434 here, since most of
+what happens in CI: 160 of them run there against 1,450 here, since most of
 the suite is one test per corpus file.
 
 ## License

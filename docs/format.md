@@ -755,7 +755,7 @@ unrelated programs together.
 `samples/` closed the rest of the keyword set, and then the argument-count and
 bare forms of the statements, which is where the real gaps turned out to be.
 
-Four things closed the remainder, each finding something the one before it
+Five things closed the remainder, each finding something the one before it
 could not:
 
 - **A writer, and then a tokenizer.** Writing the format checks more than
@@ -782,6 +782,14 @@ could not:
   way. BASIC 7 PDS named two more that 4.5 keeps a slot for and refuses to
   print, `SIGNAL` and `CHDRIVE`, and confirmed `SHELL` has a function form the
   quick reference doesn't mention.
+- **Writing a program to reach what nothing else reached, and handing the
+  result back.** The five `$INCLUDE` values had no corpus program that
+  produced them, so `samples/INCL.BAS` was written to produce them and saved
+  through QB. Making the output match to the byte then turned up three fields
+  no reader needs: the label chain, the first trailer head word, and what pads
+  an odd payload. Feeding files written here back to QB and reading its text
+  is the check on all of it, and is the only way to know the name hash can be
+  ignored rather than merely hoped about.
 
 What would help now, in order:
 
